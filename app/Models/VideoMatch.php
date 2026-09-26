@@ -10,11 +10,17 @@ class VideoMatch extends Model
 {
     public const WAITING = 'waiting';
 
+    public const MATCHED = 'connecting';
+
     public const CONNECTING = 'connecting';
 
     public const CONNECTED = 'connected';
 
     public const ENDED = 'ended';
+
+    public const FAILED = 'failed';
+
+    public const EXPIRED = 'expired';
 
     protected $table = 'matches';
 

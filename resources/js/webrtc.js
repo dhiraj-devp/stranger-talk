@@ -8,6 +8,9 @@ const cameraBtn = document.getElementById('camera');
 const nextBtn = document.getElementById('next');
 const endBtn = document.getElementById('end');
 const againBtn = document.getElementById('again');
+const reportBtn = document.getElementById('report');
+const blockBtn = document.getElementById('block');
+const reportBox = document.getElementById('report-box');
 const statusEl = document.getElementById('status');
 const audioTip = document.getElementById('audio-tip');
 
@@ -28,6 +31,12 @@ let misses = 0;
 let epoch = 0;
 let micOn = true;
 let camOn = true;
+let iceRestarted = false;
+let searchingAgain = false;
+let reverbSocket = null;
+let reverbSocketId = null;
+const reverbEl = document.getElementById('reverb-config');
+const reverb = reverbEl && reverbEl.textContent ? JSON.parse(reverbEl.textContent) : null;
 
 muteBtn.addEventListener('click', () => {
     if (!localStream) return;
@@ -35,7 +44,7 @@ muteBtn.addEventListener('click', () => {
     localStream.getAudioTracks().forEach((track) => {
         track.enabled = micOn;
     });
-    muteBtn.textContent = micOn ? 'Mute' : 'Unmute';
+    label(muteBtn, micOn ? 'Mute' : 'Unmute', !micOn);
 });
 
 cameraBtn.addEventListener('click', () => {
@@ -44,11 +53,42 @@ cameraBtn.addEventListener('click', () => {
     localStream.getVideoTracks().forEach((track) => {
         track.enabled = camOn;
     });
-    cameraBtn.textContent = camOn ? 'Camera' : 'Camera off';
+    label(cameraBtn, camOn ? 'Camera' : 'Camera off', !camOn);
 });
 
 nextBtn.addEventListener('click', onNext);
 endBtn.addEventListener('click', onEnd);
+if (reportBtn && reportBox) {
+    reportBtn.addEventListener('click', () => {
+        reportBox.hidden = !reportBox.hidden;
+    });
+    reportBox.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        try {
+            await api('/match/report', {
+                method: 'POST',
+                body: JSON.stringify({
+                    token: pageToken,
+                    reason: document.getElementById('report-reason').value,
+                    description: document.getElementById('report-note').value,
+                }),
+            });
+            reportBox.hidden = true;
+            setStatus('Report sent');
+        } catch (error) {
+            setStatus(error.message || 'Report could not be sent');
+        }
+    });
+}
+if (blockBtn) {
+    blockBtn.addEventListener('click', async () => {
+        if (!window.confirm('Block this stranger and end the call?')) return;
+        try {
+            await api('/match/block', { method: 'POST', body: JSON.stringify({ token: pageToken }) });
+        } catch (error) {}
+        onStrangerGone('blocked');
+    });
+}
 againBtn.addEventListener('click', () => {
     pageToken = newToken();
     busy = false;
@@ -68,6 +108,10 @@ window.addEventListener('pagehide', () => {
     if (!ignoreUnload()) beacon(pageToken);
 });
 
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !stopped) pollOnce();
+});
+
 start();
 
 async function start() {
@@ -85,7 +129,8 @@ async function start() {
     muteBtn.disabled = true;
     cameraBtn.disabled = true;
     audioTip.hidden = true;
-    setStatus('Searching for a stranger...');
+    searchingAgain = false;
+    setStatus('Finding someone...');
 
     try {
         if (!supportsWebRtc()) {
@@ -102,6 +147,7 @@ async function start() {
         });
         joined = true;
         await applyState(data);
+        connectReverb();
         schedulePoll();
     } catch (error) {
         failCall(friendlyError(error), joined);
@@ -122,7 +168,8 @@ async function onNext() {
     closePeer();
     stopMedia();
     resetPeerState();
-    setStatus('Searching for a stranger...');
+    searchingAgain = true;
+    setStatus('Finding someone...');
     againBtn.hidden = true;
 
     try {
@@ -138,6 +185,7 @@ async function onNext() {
         stopped = false;
         endingUi = false;
         await applyState(data);
+        connectReverb();
         schedulePoll();
     } catch (error) {
         beacon(previousToken);
@@ -166,7 +214,7 @@ async function onEnd() {
         beacon(pageToken);
     }
 
-    window.location.href = '/';
+    window.location.href = '/home';
 }
 
 function schedulePoll() {
@@ -212,13 +260,13 @@ async function applyState(data) {
 
     if (data.status === 'idle') return;
 
-    if (data.status === 'ended') {
-        onStrangerGone('server:' + (data.end_reason || 'ended'));
+    if (data.status === 'ended' || data.status === 'failed' || data.status === 'expired') {
+        onStrangerGone(data.status === 'failed' ? 'failed' : 'server:' + (data.end_reason || data.status));
         return;
     }
 
     if (data.status === 'waiting') {
-        setStatus('Searching for a stranger...');
+        setStatus('Finding someone...');
         return;
     }
 
@@ -301,12 +349,23 @@ async function ensurePeer(role) {
                 body: JSON.stringify({ token: pageToken, type: 'connected', payload: {} }),
             }).catch(() => {});
         } else if (pc.connectionState === 'failed') {
+            api('/match/signal', {
+                method: 'POST',
+                body: JSON.stringify({ token: pageToken, type: 'failed', payload: {} }),
+            }).catch(() => {});
             onStrangerGone('webrtc-failed');
         } else if (pc.connectionState === 'disconnected') {
+            if (!iceRestarted && typeof pc.restartIce === 'function') {
+                iceRestarted = true;
+                setStatus('Connection problem');
+                try { pc.restartIce(); } catch (error) {}
+            }
             clearTimeout(disconnectTimer);
             disconnectTimer = setTimeout(() => {
-                if (pc && pc.connectionState === 'disconnected') onStrangerGone('webrtc-disconnected');
-            }, 5000);
+                if (pc && (pc.connectionState === 'disconnected' || pc.connectionState === 'failed')) {
+                    onStrangerGone('webrtc-disconnected');
+                }
+            }, 8000);
         }
     };
 
@@ -345,8 +404,17 @@ async function flushPending() {
     }
 }
 
-function onStrangerGone() {
-    failCall('Status: Stranger disconnected.', true);
+function onStrangerGone(source) {
+    if (source === 'webrtc-failed' || source === 'failed') {
+        againBtn.textContent = 'Try Again';
+        failCall('Connection failed', true);
+    } else if (source === 'poll-miss') {
+        againBtn.textContent = 'Try Again';
+        failCall('Connection problem', true);
+    } else {
+        againBtn.textContent = 'Find Another';
+        failCall('Stranger disconnected', true);
+    }
 }
 
 function failCall(message, notify) {
@@ -388,12 +456,28 @@ function stopMedia() {
 
 async function ensureMedia() {
     if (localStream) return;
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    } catch (error) {
+        const videoOk = await probeMedia({ video: true });
+        const audioOk = await probeMedia({ audio: true });
+        if (!videoOk && audioOk) {
+            const denied = new Error('Camera unavailable');
+            denied.name = 'CameraUnavailable';
+            throw denied;
+        }
+        if (videoOk && !audioOk) {
+            const denied = new Error('Microphone unavailable');
+            denied.name = 'MicUnavailable';
+            throw denied;
+        }
+        throw error;
+    }
     localVideo.srcObject = localStream;
     micOn = true;
     camOn = true;
-    muteBtn.textContent = 'Mute';
-    cameraBtn.textContent = 'Camera';
+    label(muteBtn, 'Mute', false);
+    label(cameraBtn, 'Camera', false);
 }
 
 function resetPeerState() {
@@ -401,6 +485,7 @@ function resetPeerState() {
     answerApplied = false;
     pendingCandidates = [];
     cursor = 0;
+    iceRestarted = false;
     clearTimeout(disconnectTimer);
 }
 
@@ -419,13 +504,34 @@ function supportsWebRtc() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection);
 }
 
+function label(button, text, pressed) {
+    const span = button.querySelector('span');
+    if (span) span.textContent = text;
+    else button.textContent = text;
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    button.title = text;
+    button.setAttribute('aria-label', text);
+}
+
 function setStatus(text) {
     statusEl.classList.remove('is-error');
-    statusEl.textContent = 'Status: ' + text;
+    statusEl.textContent = text;
+}
+
+async function probeMedia(constraints) {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+    } catch (error) {
+        return false;
+    }
 }
 
 function friendlyError(error) {
     const name = error && error.name;
+    if (name === 'CameraUnavailable') return 'Camera unavailable';
+    if (name === 'MicUnavailable') return 'Microphone unavailable';
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         return 'Camera or microphone permission was denied. Allow access in the browser and try again.';
     }
@@ -469,6 +575,49 @@ function normalizeDescription(description) {
         .join('\r\n');
 
     return { type: description.type, sdp: sdp + '\r\n' };
+}
+
+function connectReverb() {
+    if (!reverb || !reverb.key || !window.WebSocket) return;
+    const scheme = reverb.scheme === 'https' ? 'wss' : 'ws';
+    const url = scheme + '://' + reverb.host + ':' + reverb.port + '/app/' + encodeURIComponent(reverb.key) + '?protocol=7&client=js&version=8.4.0&flash=false';
+    if (reverbSocket) {
+        try { reverbSocket.close(); } catch (error) {}
+    }
+    reverbSocket = new WebSocket(url);
+    reverbSocket.onmessage = async (event) => {
+        let payload;
+        try { payload = JSON.parse(event.data); } catch (error) { return; }
+        if (payload.event === 'pusher:connection_established') {
+            reverbSocketId = JSON.parse(payload.data).socket_id;
+            await subscribeSignal();
+        } else if (payload.event === 'pusher:ping' && reverbSocket.readyState === 1) {
+            reverbSocket.send(JSON.stringify({ event: 'pusher:pong', data: {} }));
+        } else if (payload.event === 'signal' && !stopped) {
+            pollOnce();
+        }
+    };
+}
+
+async function subscribeSignal() {
+    if (!reverbSocket || reverbSocket.readyState !== 1 || !reverbSocketId) return;
+    const channel = 'private-signals.' + pageToken;
+    const body = new URLSearchParams();
+    body.set('socket_id', reverbSocketId);
+    body.set('channel_name', channel);
+    const response = await fetch('/broadcasting/auth', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRF-TOKEN': csrf,
+        },
+        body,
+    });
+    if (!response.ok) return;
+    const auth = await response.json();
+    reverbSocket.send(JSON.stringify({ event: 'pusher:subscribe', data: { channel, auth: auth.auth } }));
 }
 
 function newToken() {

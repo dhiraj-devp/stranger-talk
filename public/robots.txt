@@ -1,2 +1,13 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /home
+Disallow: /video
+Disallow: /profile
+Disallow: /admin
+Disallow: /match
+Disallow: /blocks
+Disallow: /banned
+Disallow: /auth/
+Disallow: /api/
+
+Sitemap: /sitemap.xml

@@ -2,8 +2,11 @@
 
 @section('content')
     <section class="card">
-        <h1>Random Video Chat</h1>
-        <p class="lead">Create an account to start.</p>
+        <h1>Create an account</h1>
+        <p class="lead">Then find a stranger.</p>
+
+        <a class="button google" href="{{ route('auth.google') }}">Continue with Google</a>
+        <p class="or">or use email</p>
 
         @if ($errors->any())
             <div class="alert" role="alert">

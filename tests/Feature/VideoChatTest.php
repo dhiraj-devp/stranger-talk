@@ -5,62 +5,32 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\VideoMatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class VideoChatTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_register_logs_the_user_in_and_rejects_duplicate_email(): void
+    public function test_public_sign_in_is_google_only(): void
     {
-        $this->post('/register', [
-            'name' => 'Ava',
-            'email' => 'ava@example.com',
-            'password' => 'password12',
-            'password_confirmation' => 'password12',
-        ])->assertRedirect('/');
-
-        $this->assertAuthenticated();
-        $user = User::query()->where('email', 'ava@example.com')->first();
-        $this->assertNotNull($user);
-        $this->assertTrue(Hash::check('password12', $user->password));
-
-        $this->post('/logout');
-
-        $this->post('/register', [
-            'name' => 'Ava Two',
-            'email' => 'ava@example.com',
-            'password' => 'password12',
-            'password_confirmation' => 'password12',
-        ])->assertSessionHasErrors('email');
+        $this->get('/login')->assertOk()->assertSee('Continue with Google')->assertDontSee('Forgot password');
+        $this->get('/register')->assertNotFound();
+        $this->get('/forgot-password')->assertNotFound();
+        $this->post('/login')->assertMethodNotAllowed();
     }
 
     public function test_login_and_logout(): void
     {
-        $user = User::factory()->create([
-            'email' => 'sam@example.com',
-            'password' => 'password12',
-        ]);
+        $user = User::factory()->create(['name' => 'Sam']);
 
-        $this->post('/login', [
-            'email' => 'sam@example.com',
-            'password' => 'wrong-password',
-        ])->assertSessionHasErrors('email');
-
-        $this->post('/login', [
-            'email' => 'sam@example.com',
-            'password' => 'password12',
-        ])->assertRedirect('/');
-
-        $this->actingAs($user)->get('/')->assertOk()->assertSee('Welcome, '.$user->name)->assertSee('Find Stranger');
+        $this->actingAs($user)->get('/home')->assertOk()->assertSee('Welcome, '.$user->name)->assertSee('Find Stranger');
         $this->actingAs($user)->post('/logout')->assertRedirect('/login');
         $this->assertGuest();
     }
 
     public function test_guests_cannot_match_or_open_video(): void
     {
-        $this->get('/')->assertRedirect('/login');
+        $this->get('/')->assertOk()->assertSee('Start Video Chat');
         $this->get('/video')->assertRedirect('/login');
         $this->postJson('/match/find', ['token' => 'x'])->assertUnauthorized();
     }
