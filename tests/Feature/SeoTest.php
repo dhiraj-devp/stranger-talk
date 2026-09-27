@@ -55,6 +55,9 @@ class SeoTest extends TestCase
         $settings->forceFill(['logo' => 'seo/logo.png', 'favicon' => 'seo/icon.png'])->save();
         \App\Models\SiteSetting::forgetCache();
         $this->get('/')->assertSee('/storage/seo/logo.png', false)->assertSee('/storage/seo/icon.png', false);
+        \Illuminate\Support\Facades\Storage::disk('public')->put('seo/logo.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+        $this->get('/storage/seo/logo.png')->assertOk();
+        $this->get('/storage/../.env')->assertNotFound();
         $this->get('/missing-public-page')->assertNotFound();
         $this->get('/About')->assertRedirect('/about');
     }
