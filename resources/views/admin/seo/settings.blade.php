@@ -29,7 +29,12 @@
         <label>Header button<input name="header_cta_label" value="{{ old('header_cta_label', $site->header_cta_label) }}"></label>
         <label>Header button URL<input name="header_cta_url" value="{{ old('header_cta_url', $site->header_cta_url) }}"></label>
         @foreach (['logo' => 'Logo', 'logo_light' => 'Light logo', 'logo_dark' => 'Dark logo', 'header_logo' => 'Header logo', 'footer_logo' => 'Footer logo', 'favicon' => 'Favicon', 'apple_touch_icon' => 'Apple touch icon', 'web_app_icon' => 'App icon', 'og_image' => 'Default OG image', 'twitter_image' => 'Default X image', 'organization_logo' => 'Organization logo'] as $name => $label)
-            <label>{{ $label }} @if ($site->$name)<span class="badge">saved</span>@endif<input type="file" name="{{ $name }}" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+            <label>{{ $label }}
+                @if ($url = $site->publicUrl($site->$name))
+                    <img src="{{ $url }}" alt="{{ $label }}" height="32">
+                @endif
+                <input type="file" name="{{ $name }}" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.ico">
+            </label>
         @endforeach
         <h2>Social profiles</h2>
         @for ($i = 0; $i < 4; $i++)

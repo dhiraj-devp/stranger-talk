@@ -84,9 +84,31 @@ class SiteSetting extends Model
         return str_starts_with($url, 'http') ? $url : $this->absolute($url);
     }
 
+    public function publicUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        return '/storage/'.ltrim($path, '/');
+    }
+
+    public function headerLogoUrl(): ?string
+    {
+        return $this->publicUrl($this->header_logo ?: $this->logo ?: $this->logo_dark);
+    }
+
+    public function footerLogoUrl(): ?string
+    {
+        return $this->publicUrl($this->footer_logo ?: $this->logo ?: $this->logo_dark);
+    }
+
     public function faviconUrl(): string
     {
-        return $this->assetAbsolute($this->favicon) ?: asset('favicon.svg');
+        return $this->publicUrl($this->favicon) ?: asset('favicon.svg');
     }
 
     public function socialLinks(): array

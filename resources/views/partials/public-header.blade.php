@@ -1,5 +1,5 @@
 <header class="nav">
-    <a class="brand" href="{{ route('landing') }}">{{ $brand->site_name }}</a>
+    @include('partials.brand', ['href' => route('landing')])
     <nav class="nav-links" aria-label="Page">
         @forelse ($headerNav as $item)
             <a href="{{ $item->url }}">{{ $item->label }}</a>

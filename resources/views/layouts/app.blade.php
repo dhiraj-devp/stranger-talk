@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>{{ $title ?? 'Random Video Chat' }}</title>
-    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ $brand->faviconUrl() }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
 </head>
 <body class="app-body">
     <header class="topnav">
-        <a class="brand" href="{{ auth()->check() ? route('home') : route('landing') }}">{{ $brand->site_name }}</a>
+        @include('partials.brand', ['href' => auth()->check() ? route('home') : route('landing')])
         @auth
             <nav class="topnav-links" aria-label="Main">
                 <a href="{{ route('home') }}">Home</a>

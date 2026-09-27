@@ -7,7 +7,7 @@
 
 @section('content')
     <main class="auth-shell">
-        <a class="brand" href="{{ route('landing') }}">{{ $brand->site_name }}</a>
+        @include('partials.brand', ['href' => route('landing')])
         <h1>Meet someone new.</h1>
         <p>Sign in to start a conversation.</p>
 

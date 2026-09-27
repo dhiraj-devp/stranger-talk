@@ -6,12 +6,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex,nofollow">
     <title>Video Chat</title>
-    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ ($brand->faviconUrl()) }}">
     <link rel="stylesheet" href="{{ asset('css/room.css') }}?v={{ filemtime(public_path('css/room.css')) }}">
 </head>
 <body class="video-body">
     <header class="room-bar">
-        <a class="brand" href="{{ route('home') }}">{{ $brand->site_name ?? 'Koko Meet' }}</a>
+        @include('partials.brand', ['href' => route('home')])
         <p id="status" role="status">Finding someone...</p>
         <details class="more">
             <summary aria-label="More options" title="More">More</summary>

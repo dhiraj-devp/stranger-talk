@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>{{ $title ?? 'Admin' }} — {{ $brand->site_name }}</title>
-    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ $brand->faviconUrl() }}">
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ filemtime(public_path('css/admin.css')) }}">
 </head>
 <body>
     <div class="console">
         <aside class="side">
-            <a class="brand" href="{{ route('admin.dashboard') }}">{{ $brand->site_name }}</a>
+            @include('partials.brand', ['href' => route('admin.dashboard')])
             <p class="side-label">Site</p>
             <nav aria-label="Site">
                 <a href="{{ route('admin.seo') }}" @class(['is-on' => request()->routeIs('admin.seo')])>SEO</a>

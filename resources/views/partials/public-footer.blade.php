@@ -1,6 +1,6 @@
 <footer class="footer">
     <div>
-        <a class="brand" href="{{ route('landing') }}">{{ $brand->site_name }}</a>
+        @include('partials.brand', ['href' => route('landing'), 'logoUrl' => $brand->footerLogoUrl()])
         @if ($brand->footer_text)<p>{{ $brand->footer_text }}</p>@endif
         <p>{{ $brand->copyright }}</p>
         @if ($brand->contact_email)<p><a href="mailto:{{ $brand->contact_email }}">{{ $brand->contact_email }}</a></p>@endif

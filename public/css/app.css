@@ -30,7 +30,8 @@ p { margin: 0; }
 a { color: inherit; }
 :focus-visible { outline: 2px solid #c4b5fd; outline-offset: 3px; }
 
-.brand { font-weight: 750; letter-spacing: -0.04em; text-decoration: none; }
+.brand { display: inline-flex; align-items: center; font-weight: 750; letter-spacing: -0.04em; text-decoration: none; }
+.brand img { display: block; height: 32px; width: auto; max-width: 168px; }
 .btn, button, .button {
     display: inline-flex;
     align-items: center;
