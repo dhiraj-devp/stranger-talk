@@ -11,7 +11,7 @@
 </head>
 <body class="video-body">
     <header class="room-bar">
-        <a class="brand" href="{{ route('home') }}">StrangerTalk</a>
+        <a class="brand" href="{{ route('home') }}">{{ $brand->site_name ?? 'Koko Meet' }}</a>
         <p id="status" role="status">Finding someone...</p>
         <details class="more">
             <summary aria-label="More options" title="More">More</summary>

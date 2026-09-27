@@ -1,14 +1,19 @@
 <?php
 
 use App\Http\Controllers\Admin\PanelController;
+use App\Http\Controllers\Admin\SeoController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ContentController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SafetyController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\VideoController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,16 +22,13 @@ Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [PageController::class, 'terms'])->name('terms');
 Route::get('/guidelines', [PageController::class, 'guidelines'])->name('guidelines');
 Route::get('/health', HealthController::class)->name('health');
-Route::get('/sitemap.xml', function () {
-    $urls = [route('landing'), route('privacy'), route('terms'), route('guidelines')];
-    $body = '<?xml version="1.0" encoding="UTF-8"?>'."\n".'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-    foreach ($urls as $url) {
-        $body .= '<url><loc>'.e($url).'</loc></url>';
-    }
-    $body .= '</urlset>';
-
-    return response($body, 200, ['Content-Type' => 'application/xml']);
-})->name('sitemap');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/robots.txt', RobotsController::class)->name('robots');
+Route::get('/site.webmanifest', ManifestController::class)->name('manifest');
+Route::get('/blog', [ContentController::class, 'blog'])->name('blog');
+Route::get('/guides', [ContentController::class, 'guides'])->name('guides');
+Route::get('/blog/{slug}', [ContentController::class, 'post'])->where('slug', '[a-z0-9\-]+')->name('blog.show');
+Route::get('/guides/{slug}', [ContentController::class, 'guide'])->where('slug', '[a-z0-9\-]+')->name('guides.show');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -84,4 +86,27 @@ Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')-
     Route::get('/reports', [PanelController::class, 'reports'])->name('reports');
     Route::post('/reports/{report}', [PanelController::class, 'updateReport'])->name('reports.update');
     Route::get('/health', [PanelController::class, 'health'])->name('health');
+    Route::get('/seo', [SeoController::class, 'overview'])->name('seo');
+    Route::get('/seo/settings', [SeoController::class, 'settings'])->name('seo.edit');
+    Route::post('/seo/settings', [SeoController::class, 'updateSettings'])->name('seo.settings');
+    Route::get('/content', [SeoController::class, 'contents'])->name('content');
+    Route::get('/content/create', [SeoController::class, 'createContent'])->name('content.create');
+    Route::post('/content', [SeoController::class, 'storeContent'])->name('content.store');
+    Route::get('/content/{content}/edit', [SeoController::class, 'editContent'])->name('content.edit');
+    Route::put('/content/{content}', [SeoController::class, 'updateContent'])->name('content.update');
+    Route::delete('/content/{content}', [SeoController::class, 'destroyContent'])->name('content.destroy');
+    Route::post('/categories', [SeoController::class, 'storeCategory'])->name('categories.store');
+    Route::post('/tags', [SeoController::class, 'storeTag'])->name('tags.store');
+    Route::post('/authors', [SeoController::class, 'storeAuthor'])->name('authors.store');
+    Route::get('/media', [SeoController::class, 'media'])->name('media');
+    Route::post('/media', [SeoController::class, 'storeMedia'])->name('media.store');
+    Route::delete('/media/{medium}', [SeoController::class, 'destroyMedia'])->name('media.destroy');
+    Route::get('/redirects', [SeoController::class, 'redirects'])->name('redirects');
+    Route::post('/redirects', [SeoController::class, 'storeRedirect'])->name('redirects.store');
+    Route::delete('/redirects/{redirect}', [SeoController::class, 'destroyRedirect'])->name('redirects.destroy');
+    Route::get('/navigation', [SeoController::class, 'navigation'])->name('navigation');
+    Route::post('/navigation', [SeoController::class, 'storeNavigation'])->name('navigation.store');
+    Route::delete('/navigation/{item}', [SeoController::class, 'destroyNavigation'])->name('navigation.destroy');
 });
+
+Route::get('/{slug}', [ContentController::class, 'page'])->where('slug', '[a-z0-9\-]+')->name('content.page');

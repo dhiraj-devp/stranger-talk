@@ -10,7 +10,7 @@
 </head>
 <body class="app-body">
     <header class="topnav">
-        <a class="brand" href="{{ auth()->check() ? route('home') : route('landing') }}">StrangerTalk</a>
+        <a class="brand" href="{{ auth()->check() ? route('home') : route('landing') }}">{{ $brand->site_name }}</a>
         @auth
             <nav class="topnav-links" aria-label="Main">
                 <a href="{{ route('home') }}">Home</a>

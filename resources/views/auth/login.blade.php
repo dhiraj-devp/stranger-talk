@@ -1,13 +1,13 @@
 @extends('layouts.marketing')
 
-@section('title', 'Sign in — StrangerTalk')
+@section('title', 'Sign in — '.($brand->site_name ?? 'Koko Meet'))
 @section('robots', 'noindex,nofollow')
 @section('canonical', route('login'))
 @section('description', 'Sign in to start a conversation.')
 
 @section('content')
     <main class="auth-shell">
-        <a class="brand" href="{{ route('landing') }}">StrangerTalk</a>
+        <a class="brand" href="{{ route('landing') }}">{{ $brand->site_name }}</a>
         <h1>Meet someone new.</h1>
         <p>Sign in to start a conversation.</p>
 

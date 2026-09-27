@@ -1,7 +1,10 @@
-@extends('layouts.app')
+@extends('layouts.marketing')
 
 @section('content')
-    <article class="card wide legal">
+    @include('partials.public-header')
+    <main class="doc">
+        @include('partials.breadcrumbs')
+        <article class="card wide legal">
         <h1>Guidelines</h1>
         <ul>
             <li>Be decent. Leave if a conversation is uncomfortable.</li>
@@ -10,5 +13,7 @@
             <li>Do not try to learn who someone is beyond the call itself.</li>
             <li>Allow camera and microphone only if you want to be seen and heard. You can mute or turn the camera off.</li>
         </ul>
-    </article>
+        </article>
+    </main>
+    @include('partials.public-footer')
 @endsection

@@ -2,7 +2,7 @@
 
 @section('content')
     <h1>Overview</h1>
-    <p class="lead">Live operations for StrangerTalk. Numbers refresh about once a minute.</p>
+    <p class="lead">Live operations for {{ $brand->site_name }}. Numbers refresh about once a minute.</p>
     <section class="metrics">
         @foreach ([
             'Users' => $stats['users'],

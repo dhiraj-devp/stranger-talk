@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureNotBanned;
 use App\Http\Middleware\EnsureProfileComplete;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SeoRedirects;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,10 +29,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureNotBanned::class,
             'profile' => EnsureProfileComplete::class,
         ]);
+        $middleware->append(SeoRedirects::class);
         $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (\Throwable $e, Request $request) {
+        $exceptions->render(function (Throwable $e, Request $request) {
             if (! $request->expectsJson() || config('app.debug')) {
                 return null;
             }

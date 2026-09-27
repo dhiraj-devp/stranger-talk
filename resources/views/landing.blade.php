@@ -1,37 +1,13 @@
 @extends('layouts.marketing')
 
-@section('title', 'Meet someone new — StrangerTalk')
-@section('description', 'Random 1-to-1 video conversations with people around the world.')
-@section('canonical', url('/'))
-
 @section('content')
-    <header class="nav">
-        <a class="brand" href="{{ route('landing') }}">StrangerTalk</a>
-        <nav class="nav-links" aria-label="Page">
-            <a href="#how">How it works</a>
-            <a href="#safety">Safety</a>
-            <a href="#faq">FAQ</a>
-        </nav>
-        <div class="nav-actions">
-            <a class="nav-signin" href="{{ route('login') }}">Sign in</a>
-            <a class="btn btn-primary" href="{{ route('login') }}">Start Video Chat</a>
-        </div>
-        <details class="nav-menu">
-            <summary aria-label="Open menu">Menu</summary>
-            <div>
-                <a href="#how">How it works</a>
-                <a href="#safety">Safety</a>
-                <a href="#faq">FAQ</a>
-                <a href="{{ route('login') }}">Sign in</a>
-            </div>
-        </details>
-    </header>
+    @include('partials.public-header')
 
     <main>
         <section class="hero">
             <div class="hero-copy">
                 <h1>Meet someone new.<br>Anywhere in the world.</h1>
-                <p>Random 1-to-1 video conversations with people around the world.</p>
+                <p>{{ $brand->site_name }} is a random video chat: one live, one-to-one conversation with a stranger.</p>
                 <div class="hero-actions">
                     <a class="btn btn-primary" href="{{ route('login') }}">Start Video Chat</a>
                     <a class="btn btn-ghost" href="#how">How it works</a>
@@ -42,7 +18,7 @@
             </div>
         </section>
 
-        <section class="proof" aria-label="What StrangerTalk is">
+        <section class="proof" aria-label="What {{ $brand->site_name }} is">
             <p>1-to-1 video conversations</p>
             <p>Connect globally</p>
             <p>No complicated setup</p>
@@ -116,7 +92,7 @@
             <ul>
                 <li><strong>Block</strong> someone so you are not paired again.</li>
                 <li><strong>Report</strong> a call for a moderator to review.</li>
-                <li><strong>Community guidelines</strong> explain what is not allowed.</li>
+                <li><a href="{{ route('guidelines') }}">Community guidelines</a> explain what is not allowed. <a href="/safety">Staying safe</a> covers the practical steps.</li>
                 <li><strong>Private 1-to-1</strong> means one other person, not a room full of people.</li>
                 <li>The platform does not record video or audio.</li>
             </ul>
@@ -138,26 +114,12 @@
         <section id="faq" class="section">
             <h2>FAQ</h2>
             <div class="faq">
-                <details>
-                    <summary>Do you record video calls?</summary>
-                    <p>No. Video and audio are not stored by StrangerTalk.</p>
-                </details>
-                <details>
-                    <summary>How does matching work?</summary>
-                    <p>You are paired at random with one other person who is also looking.</p>
-                </details>
-                <details>
-                    <summary>Can I skip someone?</summary>
-                    <p>Yes. Next ends the current call and looks for someone else.</p>
-                </details>
-                <details>
-                    <summary>What happens if someone behaves badly?</summary>
-                    <p>Leave the call, then report or block them from the menu.</p>
-                </details>
-                <details>
-                    <summary>Do I need an account?</summary>
-                    <p>Yes. Sign in with Google, then confirm a short profile the first time.</p>
-                </details>
+                @foreach (\App\Services\SeoBuilder::faqs($brand->site_name) as $faq)
+                    <details>
+                        <summary>{{ $faq['q'] }}</summary>
+                        <p>{{ $faq['a'] }}</p>
+                    </details>
+                @endforeach
             </div>
         </section>
 
@@ -167,13 +129,5 @@
         </section>
     </main>
 
-    <footer class="footer">
-        <a class="brand" href="{{ route('landing') }}">StrangerTalk</a>
-        <nav aria-label="Footer">
-            <a href="{{ route('privacy') }}">Privacy</a>
-            <a href="{{ route('terms') }}">Terms</a>
-            <a href="{{ route('guidelines') }}">Community Guidelines</a>
-            <a href="#faq">FAQ</a>
-        </nav>
-    </footer>
+    @include('partials.public-footer')
 @endsection

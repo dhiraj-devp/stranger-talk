@@ -4,14 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
-    <title>{{ $title ?? 'Admin' }} — StrangerTalk</title>
+    <title>{{ $title ?? 'Admin' }} — {{ $brand->site_name }}</title>
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ filemtime(public_path('css/admin.css')) }}">
 </head>
 <body>
     <div class="console">
         <aside class="side">
-            <a class="brand" href="{{ route('admin.dashboard') }}">StrangerTalk</a>
+            <a class="brand" href="{{ route('admin.dashboard') }}">{{ $brand->site_name }}</a>
+            <p class="side-label">Site</p>
+            <nav aria-label="Site">
+                <a href="{{ route('admin.seo') }}" @class(['is-on' => request()->routeIs('admin.seo')])>SEO</a>
+                <a href="{{ route('admin.seo.edit') }}" @class(['is-on' => request()->routeIs('admin.seo.edit')])>Branding</a>
+                <a href="{{ route('admin.content') }}" @class(['is-on' => request()->routeIs('admin.content')])>Content</a>
+                <a href="{{ route('admin.content.create') }}" @class(['is-on' => request()->routeIs('admin.content.create', 'admin.content.edit')])>Editor</a>
+                <a href="{{ route('admin.media') }}" @class(['is-on' => request()->routeIs('admin.media')])>Media</a>
+                <a href="{{ route('admin.redirects') }}" @class(['is-on' => request()->routeIs('admin.redirects')])>Redirects</a>
+                <a href="{{ route('admin.navigation') }}" @class(['is-on' => request()->routeIs('admin.navigation')])>Navigation</a>
+            </nav>
             <p class="side-label">Operations</p>
             <nav aria-label="Admin">
                 <a href="{{ route('admin.dashboard') }}" @class(['is-on' => request()->routeIs('admin.dashboard')])>Overview</a>
