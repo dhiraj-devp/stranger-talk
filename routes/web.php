@@ -72,11 +72,15 @@ Route::middleware(['auth', 'active', 'profile'])->group(function () {
 
 Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [PanelController::class, 'dashboard'])->name('dashboard');
+    Route::get('/live', [PanelController::class, 'live'])->name('live');
     Route::get('/users', [PanelController::class, 'users'])->name('users');
     Route::get('/users/{user}', [PanelController::class, 'showUser'])->name('users.show');
     Route::post('/users/{user}/ban', [PanelController::class, 'ban'])->name('users.ban');
     Route::post('/users/{user}/unban', [PanelController::class, 'unban'])->name('users.unban');
     Route::delete('/users/{user}', [PanelController::class, 'destroy'])->name('users.destroy');
+    Route::get('/bans', [PanelController::class, 'bans'])->name('bans');
+    Route::get('/matches', [PanelController::class, 'matches'])->name('matches');
+    Route::get('/audit', [PanelController::class, 'audit'])->name('audit');
     Route::get('/reports', [PanelController::class, 'reports'])->name('reports');
     Route::post('/reports/{report}', [PanelController::class, 'updateReport'])->name('reports.update');
     Route::get('/health', [PanelController::class, 'health'])->name('health');

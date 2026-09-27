@@ -216,6 +216,13 @@ class PlatformTest extends TestCase
 
         $this->actingAs($a)->get('/admin')->assertForbidden();
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Pending reports');
+        foreach (['/admin/live', '/admin/users', '/admin/bans', '/admin/matches', '/admin/audit', '/admin/health', '/admin/reports'] as $path) {
+            $this->actingAs($a)->get($path)->assertForbidden();
+            $this->actingAs($admin)->get($path)->assertOk();
+        }
+        auth()->logout();
+        $this->get('/admin')->assertRedirect('/login');
+        $this->assertSame(url('/admin'), session('url.intended'));
         $report = Report::query()->first();
         $this->actingAs($admin)->post('/admin/reports/'.$report->id, [
             'status' => 'resolved',

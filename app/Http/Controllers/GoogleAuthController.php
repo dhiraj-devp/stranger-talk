@@ -43,6 +43,10 @@ class GoogleAuthController extends Controller
         $user->forceFill(['status' => 'active', 'last_seen_at' => now()])->save();
         app(AnalyticsRecorder::class)->track($user, 'login');
 
-        return redirect()->route($user->profileComplete() ? 'home' : 'profile.setup');
+        if (! $user->profileComplete()) {
+            return redirect()->route('profile.setup');
+        }
+
+        return redirect()->intended(route('home'));
     }
 }

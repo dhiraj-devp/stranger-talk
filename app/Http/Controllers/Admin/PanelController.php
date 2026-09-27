@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AnalyticsEvent;
 use App\Models\AuditLog;
+use App\Models\Ban;
 use App\Models\MatchEvent;
 use App\Models\Report;
 use App\Models\User;
@@ -21,21 +22,46 @@ class PanelController extends Controller
     {
         $stats = Cache::remember('admin.dashboard', 60, fn () => $this->stats());
 
-        return view('admin.dashboard', ['stats' => $stats]);
+        return view('admin.dashboard', [
+            'stats' => $stats,
+            'recentReports' => Report::query()->with(['reporter', 'reported'])->latest()->limit(5)->get(),
+            'recentMatches' => VideoMatch::query()
+                ->select(['id', 'user_one_id', 'user_two_id', 'status', 'end_reason', 'created_at'])
+                ->with(['userOne:id,name', 'userTwo:id,name'])
+                ->latest()
+                ->limit(5)
+                ->get(),
+        ]);
+    }
+
+    public function live(): View
+    {
+        return view('admin.live', [
+            'searching' => User::query()->where('status', User::SEARCHING)->latest('last_seen_at')->limit(50)->get(),
+            'calls' => VideoMatch::query()
+                ->select(['id', 'user_one_id', 'user_two_id', 'status', 'created_at'])
+                ->with(['userOne:id,name', 'userTwo:id,name'])
+                ->whereIn('status', [VideoMatch::CONNECTING, VideoMatch::CONNECTED])
+                ->latest()
+                ->limit(50)
+                ->get(),
+        ]);
     }
 
     public function users(Request $request): View
     {
         $q = trim((string) $request->query('q', ''));
+        $status = (string) $request->query('status', '');
         $users = User::query()
             ->when($q !== '', fn ($query) => $query->where(function ($query) use ($q) {
                 $query->where('name', 'like', "%{$q}%")->orWhere('email', 'like', "%{$q}%");
             }))
+            ->when(in_array($status, [User::ACTIVE, User::OFFLINE, User::SEARCHING, User::IN_CALL, User::BANNED], true), fn ($query) => $query->where('status', $status))
             ->latest()
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.users', ['users' => $users, 'q' => $q]);
+        return view('admin.users', ['users' => $users, 'q' => $q, 'status' => $status]);
     }
 
     public function showUser(User $user): View
@@ -86,7 +112,10 @@ class PanelController extends Controller
 
     public function reports(Request $request): View
     {
-        $status = $request->query('status', Report::PENDING);
+        $status = (string) $request->query('status', Report::PENDING);
+        if (! in_array($status, [Report::PENDING, Report::REVIEWING, Report::RESOLVED, Report::REJECTED], true)) {
+            $status = Report::PENDING;
+        }
         $reports = Report::query()->with(['reporter', 'reported'])->where('status', $status)->latest()->paginate(20);
 
         return view('admin.reports', ['reports' => $reports, 'status' => $status]);
@@ -109,6 +138,31 @@ class PanelController extends Controller
         \App\Models\AuditLog::write($request->user(), $action, $report, ['status' => $data['status']], $request->ip());
 
         return back()->with('status', 'Report updated.');
+    }
+
+    public function bans(): View
+    {
+        return view('admin.bans', [
+            'bans' => Ban::query()->with(['user:id,name,email', 'admin:id,name'])->latest()->paginate(25),
+        ]);
+    }
+
+    public function matches(): View
+    {
+        return view('admin.matches', [
+            'matches' => VideoMatch::query()
+                ->select(['id', 'user_one_id', 'user_two_id', 'status', 'end_reason', 'created_at', 'updated_at'])
+                ->with(['userOne:id,name', 'userTwo:id,name'])
+                ->latest()
+                ->paginate(25),
+        ]);
+    }
+
+    public function audit(): View
+    {
+        return view('admin.audit', [
+            'logs' => AuditLog::query()->with('admin:id,name')->latest('id')->paginate(30),
+        ]);
     }
 
     public function health(): View
