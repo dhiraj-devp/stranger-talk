@@ -126,6 +126,9 @@ class SeoController extends Controller
         $data['socials'] = $socials;
 
         foreach (['logo', 'logo_light', 'logo_dark', 'header_logo', 'footer_logo', 'favicon', 'apple_touch_icon', 'web_app_icon', 'og_image', 'twitter_image', 'organization_logo'] as $field) {
+            if ($request->boolean('remove_'.$field)) {
+                $data[$field] = null;
+            }
             if ($request->hasFile($field)) {
                 $request->validate([
                     $field => ['file', 'mimes:jpg,jpeg,png,webp,gif,svg,ico', 'max:2048'],

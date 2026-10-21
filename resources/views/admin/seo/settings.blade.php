@@ -1,11 +1,30 @@
 @extends('layouts.admin')
 
 @section('content')
-    <h1>Site settings</h1>
-    <p class="lead">Branding, default metadata, analytics IDs, and robots rules. Keywords are stored for editors and are not printed as a meta keywords tag.</p>
+    <h1>Branding</h1>
+    <p class="lead">Upload the header and footer logos here. They replace the site name on the live site after you save. Use a wide PNG or WebP.</p>
     <form class="panel stack" method="POST" action="{{ route('admin.seo.settings') }}" enctype="multipart/form-data">
         @csrf
-        <h2>General</h2>
+        <h2>Header, footer, and icon</h2>
+        @foreach ([
+            'header_logo' => 'Header logo — top of the public site, sign-in, and video room',
+            'footer_logo' => 'Footer logo — bottom of the public site',
+            'logo' => 'Main logo — used wherever a header or footer logo is not set',
+            'favicon' => 'Favicon — browser tab icon',
+            'apple_touch_icon' => 'Apple touch icon',
+            'og_image' => 'Social share image',
+        ] as $name => $label)
+            <label>{{ $label }}
+                @if ($url = $site->publicUrl($site->$name))
+                    <img src="{{ $url }}" alt="" height="40">
+                    <span class="check"><input type="checkbox" name="remove_{{ $name }}" value="1"> Remove current file</span>
+                @else
+                    <span class="lead">No file yet. The site name is shown instead.</span>
+                @endif
+                <input type="file" name="{{ $name }}" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.ico">
+            </label>
+        @endforeach
+        <h2>Name and text</h2>
         @foreach ([
             'site_name' => 'Site name', 'tagline' => 'Tagline', 'default_title' => 'Default title',
             'organization_name' => 'Organization name', 'contact_email' => 'Contact email', 'support_url' => 'Support URL',
@@ -28,10 +47,12 @@
         <label>Copyright<input name="copyright" value="{{ old('copyright', $site->copyright) }}"></label>
         <label>Header button<input name="header_cta_label" value="{{ old('header_cta_label', $site->header_cta_label) }}"></label>
         <label>Header button URL<input name="header_cta_url" value="{{ old('header_cta_url', $site->header_cta_url) }}"></label>
-        @foreach (['logo' => 'Logo', 'logo_light' => 'Light logo', 'logo_dark' => 'Dark logo', 'header_logo' => 'Header logo', 'footer_logo' => 'Footer logo', 'favicon' => 'Favicon', 'apple_touch_icon' => 'Apple touch icon', 'web_app_icon' => 'App icon', 'og_image' => 'Default OG image', 'twitter_image' => 'Default X image', 'organization_logo' => 'Organization logo'] as $name => $label)
+        <h2>More images</h2>
+        @foreach (['logo_light' => 'Light logo', 'logo_dark' => 'Dark logo', 'web_app_icon' => 'App icon', 'twitter_image' => 'X image', 'organization_logo' => 'Organization logo'] as $name => $label)
             <label>{{ $label }}
                 @if ($url = $site->publicUrl($site->$name))
-                    <img src="{{ $url }}" alt="{{ $label }}" height="32">
+                    <img src="{{ $url }}" alt="" height="40">
+                    <span class="check"><input type="checkbox" name="remove_{{ $name }}" value="1"> Remove current file</span>
                 @endif
                 <input type="file" name="{{ $name }}" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.ico">
             </label>
