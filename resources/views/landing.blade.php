@@ -7,10 +7,12 @@
             <div class="home-copy">
                 <h1>Random one-to-one video chat.</h1>
                 <p>{{ $brand->site_name }} pairs you with one other person who is also looking. The call stays between the two of you. You can move to the next person or end it.</p>
+                <p>For people who want one live conversation at a time. Sign in with Google, then allow the camera when the call starts.</p>
                 <div class="hero-actions">
                     <a class="btn btn-primary" href="{{ route('login') }}">Start Video Chat</a>
                     <a class="btn btn-ghost" href="#how">How it works</a>
                 </div>
+                <p class="home-links"><a href="/random-video-chat">Random video chat</a><a href="/talk-to-strangers">Talk to strangers</a><a href="/omegle-alternative">Omegle alternative</a><a href="/features">Features</a><a href="/safety">Safety</a><a href="{{ route('privacy') }}">Privacy</a></p>
             </div>
             <div class="home-preview">
                 @include('partials.call-preview')
@@ -18,7 +20,10 @@
         </section>
 
         <section id="how" class="home-block">
-            <h2>How a call starts</h2>
+            <div class="home-head">
+                <h2>How a call starts</h2>
+                <p>Sign in, confirm two details, then wait for one person.</p>
+            </div>
             <ol class="home-steps">
                 <li>
                     <h3>Sign in with Google</h3>
@@ -35,6 +40,7 @@
             </ol>
         </section>
 
+        <div class="home-split">
         <section class="home-block">
             <h2>What is on the call screen</h2>
             <ul class="home-list">
@@ -55,6 +61,7 @@
             </ul>
             <p class="home-links"><a href="/safety">Safety</a><a href="{{ route('guidelines') }}">Guidelines</a><a href="{{ route('privacy') }}">Privacy</a></p>
         </section>
+        </div>
 
         <section class="home-block">
             <h2>Matching preferences</h2>

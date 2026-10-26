@@ -538,7 +538,7 @@ function mediaConstraints() {
     } catch (error) {}
     return {
         audio: mic ? { deviceId: { exact: mic } } : true,
-        video: cam ? { deviceId: { exact: cam } } : true,
+        video: cam ? { deviceId: { exact: cam }, facingMode: 'user' } : { facingMode: 'user' },
     };
 }
 

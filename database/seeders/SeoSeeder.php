@@ -114,6 +114,7 @@ TXT, $start->id, true);
         $about->update(['related_ids' => [$how->id, $guide->id]]);
         $guide->update(['related_ids' => [$how->id], 'featured' => true]);
         Content::query()->where('slug', 'safety')->update(['related_ids' => [$safePost->id]]);
+        $this->syncGrowth();
 
         $links = [
             ['header', 'How it works', '/#how', 1],
@@ -128,12 +129,125 @@ TXT, $start->id, true);
             ['footer', 'Terms', '/terms', 6],
             ['footer', 'Community Guidelines', '/guidelines', 7],
             ['footer', 'Contact', '/contact', 8],
+            ['footer', 'Features', '/features', 9],
+            ['footer', 'Help', '/help', 10],
+            ['footer', 'Random video chat', '/random-video-chat', 11],
+            ['footer', 'Talk to strangers', '/talk-to-strangers', 12],
+            ['footer', 'Omegle alternative', '/omegle-alternative', 13],
         ];
         foreach ($links as [$location, $label, $url, $sort]) {
             NavigationItem::query()->firstOrCreate(
                 ['location' => $location, 'url' => $url],
                 ['label' => $label, 'sort_order' => $sort]
             );
+        }
+    }
+
+    public function syncGrowth(): void
+    {
+        $oldTitle = 'Koko Meet — random video chat with strangers';
+        $oldDescription = 'Koko Meet pairs you with one person for a live video conversation. Sign in with Google, get matched at random, and talk one-to-one.';
+        $defaults = SiteSetting::defaults();
+        SiteSetting::query()
+            ->where('default_title', $oldTitle)
+            ->where('default_description', $oldDescription)
+            ->update([
+                'default_title' => $defaults['default_title'],
+                'default_description' => $defaults['default_description'],
+            ]);
+        SiteSetting::forgetCache();
+
+        $guide = Content::query()->where('type', 'guide')->where('slug', 'random-video-chat')->first();
+        if ($guide) {
+            $guide->update(['slug' => 'what-to-expect']);
+            \App\Models\SeoRedirect::query()->firstOrCreate(
+                ['from_path' => '/guides/random-video-chat'],
+                ['to_path' => '/guides/what-to-expect', 'status_code' => 301, 'enabled' => true]
+            );
+            \App\Models\SeoRedirect::forgetCache();
+        }
+        $guideId = Content::query()->where('type', 'guide')->where('slug', 'what-to-expect')->value('id');
+        $pages = [
+            ['random-video-chat', 'Random video chat', 'How a one-to-one random video chat starts on Koko Meet, from Google sign-in to Next and End.', <<<'TXT'
+A random video chat on Koko Meet is one live call with one other person. You are not put in a group room.
+
+## How it starts
+
+[Sign in](/login) with Google. The first time, confirm your gender and country. Then start a search. When someone else is also waiting, the two browsers connect. If nobody is waiting, you stay in the queue.
+
+## During the call
+
+You see two equal video panels. A text chat sits beside the video. Mute, Next, and End are on the call screen. Next asks you to confirm before it leaves the person and looks for someone else. End leaves without starting another search.
+
+Koko Meet does not store the video or audio. Read [Safety](/safety) and [Privacy](/privacy) before you start. The guide [What to expect from a random video chat](/guides/what-to-expect) covers the first minute.
+TXT],
+            ['talk-to-strangers', 'Talk to strangers online', 'What the other person can see when you talk to a stranger, and how to leave, block, or report.', <<<'TXT'
+Talking to a stranger here means one video conversation with one person you have not chosen.
+
+## What the other person can see
+
+They see and hear what you share live. A first name from your Google account can appear on the panel, with your country when it is set. Do not add a phone number, address, school, or another account.
+
+## How to leave
+
+Next ends this match and looks for another person. End stops without a new search. Block keeps that person from being paired with you again. Report sends the reason you write to a moderator. There is no recording for them to watch.
+
+Start from [Sign in](/login). The longer notes are on [Safety](/safety) and [Privacy](/privacy).
+TXT],
+            ['omegle-alternative', 'An Omegle alternative for one-to-one chat', 'What Koko Meet includes if you want a one-to-one video chat, and what it does not copy from other sites.', <<<'TXT'
+People looking for an Omegle alternative usually want a video conversation with a stranger. Koko Meet is a one-to-one video chat. It is not a copy of any other product, and it does not offer a group room or a text-only stranger chat.
+
+## What a call includes
+
+You [sign in](/login) with Google. You are paired with one other person who is also looking. The call has video, audio, and a text chat for that match. Mute, Next, and End are on the screen. Next asks for confirmation while a call is connected. Report and block are available if you want that person stopped.
+
+## What it does not include
+
+Koko Meet does not record the call. Moderators can read a report you submit. They cannot watch a recording. Gender and country can be saved on the account. Those preferences do not change who you meet until that option is turned on.
+
+Read [Features](/features), [Safety](/safety), and [Privacy](/privacy) for the details that are actually supported.
+TXT],
+            ['features', 'Koko Meet features', 'The call controls Koko Meet actually has: video, text chat, mute, Next, End, report, and block.', <<<'TXT'
+These are the controls on a Koko Meet call. Nothing else is implied.
+
+## On the call
+
+Two equal video panels show you and the other person. Your preview is a mirror. Their picture is not. Name and country appear on each panel when a match starts. Mute turns your microphone off. Text chat sends a short message during the call. Next, after a confirmation, leaves this person and looks for another. End leaves the call. Report and block are in the menu.
+
+## Camera and microphone
+
+You pick a camera and microphone from the menu. The camera stays on when you enter the room. There is no separate camera on/off button in the dock. The site does not ask for the camera on the public pages. The browser asks when you open the call.
+
+## Preferences
+
+You can save a gender and a country preference. Matching does not use them until that option is turned on. Blocks and bans still apply.
+
+[Sign in](/login) to start. [Safety](/safety), [Privacy](/privacy), and [Help](/help) cover leaving a call and fixing a camera that will not start.
+TXT],
+            ['help', 'Help with camera and connection problems', 'What to try when the camera, microphone, or connection fails before or during a call.', <<<'TXT'
+Most failed calls are a blocked camera, a blocked microphone, or a network that cannot connect the two browsers.
+
+## Camera or microphone
+
+Use a current browser. When the call page opens, allow the camera and microphone if you want to be seen and heard. If you blocked them earlier, change the permission in the browser's site settings and reload. You can choose a different camera or microphone from the menu on the call screen.
+
+## Connection
+
+The status line says whether the app is still looking or connecting. If the other person leaves, the call ends. If a direct connection cannot be made and a relay is configured, media may pass through that relay for the length of the call. Koko Meet still does not store the video.
+
+## If the conversation is the problem
+
+Leave. Use End, or Next if you want another person. Block and report are for someone who should not be paired with you again, or who broke the [guidelines](/guidelines).
+
+[Safety](/safety) and [Privacy](/privacy) explain what is stored. [Sign in](/login) when you are ready to try again.
+TXT],
+        ];
+
+        foreach ($pages as [$slug, $title, $excerpt, $body]) {
+            $page = $this->page('page', $slug, $title, $excerpt, $body, null, true);
+            if ($page->wasRecentlyCreated && $guideId) {
+                $page->update(['related_ids' => [$guideId]]);
+            }
         }
     }
 

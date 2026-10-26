@@ -14,7 +14,21 @@
         <article><span>Posts without an image</span><strong>{{ $noImage }}</strong></article>
         <article><span>Images missing alt</span><strong>{{ $missingAlt }}</strong></article>
     </section>
-    <p class="lead">Sitemap: <a href="{{ route('sitemap') }}">/sitemap.xml</a> · Robots: <a href="{{ route('robots') }}">/robots.txt</a>. Empty canonical fields still get a generated canonical. There is no external crawl and no Search Console count until you add that property yourself.</p>
+    <p class="lead">Sitemap: <a href="{{ route('sitemap') }}">/sitemap.xml</a> · Robots: <a href="{{ route('robots') }}">/robots.txt</a>. Empty canonical fields still get a generated canonical. There is no external crawl and no Search Console count until you add that property yourself. Set the canonical base to https://kokomeet.live, paste the Search Console verification token, submit https://kokomeet.live/sitemap.xml, then use URL Inspection. A finding here is not an indexing result.</p>
+    <section class="panel">
+        <h2>Technical issues</h2>
+        @forelse ($findings as $finding)
+            <p>{{ strtoupper($finding['severity']) }} {{ $finding['url'] }} — {{ $finding['description'] }} {{ $finding['fix'] }}</p>
+        @empty
+            <p class="empty">No findings from the local check.</p>
+        @endforelse
+    </section>
+    @if ($queryReport)
+        <section class="panel">
+            <h2>Imported queries</h2>
+            <pre>{{ $queryReport }}</pre>
+        </section>
+    @endif
     <div class="split">
         <section class="panel">
             <h2>Duplicate titles</h2>

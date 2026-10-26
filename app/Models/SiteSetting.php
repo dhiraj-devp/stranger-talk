@@ -23,8 +23,8 @@ class SiteSetting extends Model
         return [
             'site_name' => 'Koko Meet',
             'tagline' => 'Random 1-to-1 video chat',
-            'default_title' => 'Koko Meet — random video chat with strangers',
-            'default_description' => 'Koko Meet pairs you with one person for a live video conversation. Sign in with Google, get matched at random, and talk one-to-one.',
+            'default_title' => 'Koko Meet — Random Video Chat with Strangers',
+            'default_description' => 'Koko Meet is a one-to-one random video chat with text in the call. Read the privacy and safety notes, then sign in to start.',
             'keywords' => 'random video chat, stranger video chat, talk to strangers online',
             'organization_name' => 'Koko Meet',
             'organization_description' => 'Koko Meet is a random video chat for one-to-one conversations.',

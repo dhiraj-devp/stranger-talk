@@ -28,6 +28,7 @@ Route::get('/', [PageController::class, 'landing'])->name('landing');
 Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [PageController::class, 'terms'])->name('terms');
 Route::get('/guidelines', [PageController::class, 'guidelines'])->name('guidelines');
+Route::redirect('/community-guidelines', '/guidelines', 301);
 Route::get('/health', HealthController::class)->name('health');
 Route::post('/analytics/pulse', [\App\Http\Controllers\AnalyticsController::class, 'pulse'])->name('analytics.pulse');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');

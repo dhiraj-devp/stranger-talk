@@ -13,6 +13,8 @@ use App\Models\SiteSetting;
 use App\Models\Tag;
 use App\Services\SeoAuditor;
 use App\Services\SeoBuilder;
+use App\Services\SeoHealthCheck;
+use Illuminate\Support\Facades\File;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -54,6 +56,8 @@ class SeoController extends Controller
             'recent' => Content::query()->latest('updated_at')->limit(8)->get(),
             'broken' => $broken,
             'disallowAll' => (bool) SiteSetting::current()->robots_disallow_all,
+            'findings' => app(SeoHealthCheck::class)->findings(),
+            'queryReport' => File::exists(storage_path('app/seo/query-report.md')) ? File::get(storage_path('app/seo/query-report.md')) : null,
         ]);
     }
 

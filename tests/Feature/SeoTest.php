@@ -32,16 +32,30 @@ class SeoTest extends TestCase
         $this->get('/blog')->assertOk()->assertSee('How random video chat works');
         $this->get('/blog/how-random-video-chat-works')->assertOk()->assertSee('Article', false);
         $this->get('/guides')->assertOk();
-        $this->get('/guides/random-video-chat')->assertOk();
+        $this->get('/guides/random-video-chat')->assertRedirect('/guides/what-to-expect')->assertStatus(301);
+        $this->get('/guides/what-to-expect')->assertOk()->assertSee('Article', false);
+        $this->get('/random-video-chat')->assertOk()->assertSee('<h1>Random video chat</h1>', false)->assertSee('index,follow', false)->assertSee('href="/safety"', false);
+        $this->get('/talk-to-strangers')->assertOk()->assertSee('<h1>Talk to strangers online</h1>', false)->assertSee('index,follow', false);
+        $this->get('/omegle-alternative')->assertOk()->assertSee('<h1>An Omegle alternative for one-to-one chat</h1>', false)->assertSee('index,follow', false);
+        $this->get('/features')->assertOk()->assertSee('<h1>Koko Meet features</h1>', false)->assertSee('index,follow', false);
+        $this->get('/help')->assertOk()->assertSee('<h1>Help with camera and connection problems</h1>', false)->assertSee('index,follow', false);
+        $this->get('/community-guidelines')->assertRedirect('/guidelines')->assertStatus(301);
         $this->get('/login')->assertOk()->assertSee('noindex,nofollow', false)->assertSee('Continue with Google');
 
         $this->get('/sitemap.xml')->assertOk()
             ->assertSee(url('/about'), false)
             ->assertSee(url('/blog/how-random-video-chat-works'), false)
+            ->assertSee(url('/privacy'), false)
+            ->assertSee(url('/blog'), false)
+            ->assertSee(url('/guides'), false)
+            ->assertSee(url('/contact'), false)
+            ->assertSee(url('/random-video-chat'), false)
+            ->assertSee(url('/omegle-alternative'), false)
             ->assertDontSee(url('/admin'), false)
             ->assertDontSee(url('/login'), false)
             ->assertDontSee(url('/video'), false)
-            ->assertDontSee(url('/home'), false);
+            ->assertDontSee(url('/home'), false)
+            ->assertDontSee(url('/health'), false);
 
         $this->get('/robots.txt')->assertOk()
             ->assertSee('Allow: /')
@@ -60,6 +74,16 @@ class SeoTest extends TestCase
         $this->get('/storage/../.env')->assertNotFound();
         $this->get('/missing-public-page')->assertNotFound();
         $this->get('/About')->assertRedirect('/about');
+
+        $this->artisan('seo:audit')->assertSuccessful();
+
+        $csv = storage_path('framework/testing-queries.csv');
+        file_put_contents($csv, "query,page,clicks,impressions,ctr,position\nrandom video chat,https://kokomeet.live/,3,40,7.5%,8\nunrelated hobby,,0,2,0%,40\n");
+        $this->artisan('seo:queries', ['csv' => $csv])->assertSuccessful();
+        $report = file_get_contents(storage_path('app/seo/query-report.md'));
+        $this->assertStringContainsString('Map to /random-video-chat.', $report);
+        $this->assertStringContainsString('Do not create a page yet.', $report);
+        @unlink($csv);
     }
 
     public function test_admin_can_publish_and_redirects_do_not_loop(): void

@@ -43,7 +43,9 @@
             </form>
         </details>
         <details class="more">
-            <summary aria-label="More options" title="More">More</summary>
+            <summary aria-label="Open menu" title="Menu">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </summary>
             <div class="more-panel">
                 <label for="cam-device">Camera</label>
                 <select id="cam-device"></select>

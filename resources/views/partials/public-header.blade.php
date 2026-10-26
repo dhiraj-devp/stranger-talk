@@ -14,7 +14,9 @@
         <a class="btn btn-primary" href="{{ $brand->header_cta_url ?: route('login') }}">{{ $brand->header_cta_label ?: 'Start Video Chat' }}</a>
     </div>
     <details class="nav-menu">
-        <summary aria-label="Open menu">Menu</summary>
+        <summary aria-label="Open menu">
+            <svg class="nav-burger" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </summary>
         <div>
             <a href="{{ route('landing') }}#how">How it works</a>
             <a href="{{ route('landing') }}#safety">Safety</a>

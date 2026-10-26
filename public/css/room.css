@@ -34,10 +34,17 @@ html, body.video-body { margin: 0; height: 100%; overflow: hidden; background: v
 .more summary {
     list-style: none;
     cursor: pointer;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    display: grid;
+    place-items: center;
     border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 8px 14px;
+    border-radius: 10px;
+    color: var(--ink);
 }
+.more summary svg { display: block; }
 .more summary::-webkit-details-marker { display: none; }
 .more-panel {
     position: absolute;
@@ -154,7 +161,8 @@ body.chat-open .dock { right: 320px; }
     border: 1px solid rgba(255, 255, 255, 0.16);
 }
 #remote, #local { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #111119; }
-#local { transform: scaleX(-1); }
+#local-wrap > #local { transform: scaleX(-1); }
+#remote-pane > #remote { transform: none; }
 .identity {
     position: absolute;
     top: 12px;

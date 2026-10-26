@@ -80,6 +80,23 @@ class Content extends Model
         return $blocks;
     }
 
+    public static function linked(string $text): string
+    {
+        $safe = e($text);
+
+        return preg_replace_callback(
+            '/\[([^\]\n]{1,80})\]\((\/[a-z0-9\-\/]+)\)/',
+            function (array $match): string {
+                if (str_contains($match[2], '//') || ! preg_match('#^/(?:[a-z0-9\-]+)(?:/[a-z0-9\-]+)*$#', $match[2])) {
+                    return $match[0];
+                }
+
+                return '<a href="'.e($match[2]).'">'.e($match[1]).'</a>';
+            },
+            $safe
+        ) ?? $safe;
+    }
+
     public function faqPairs(): array
     {
         $pairs = [];

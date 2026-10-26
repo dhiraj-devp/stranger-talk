@@ -27,7 +27,7 @@
                     @if ($block['type'] === 'h2')
                         <h2>{{ $block['text'] }}</h2>
                     @else
-                        <p>{{ $block['text'] }}</p>
+                        <p>{!! \App\Models\Content::linked($block['text']) !!}</p>
                     @endif
                 @endforeach
             @endif

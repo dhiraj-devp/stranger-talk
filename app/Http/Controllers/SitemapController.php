@@ -20,9 +20,21 @@ class SitemapController extends Controller
             [$site->absolute('/guides'), null],
         ];
 
-        Content::query()->public()->where('robots_index', true)->orderBy('id')->each(function (Content $content) use (&$urls, $site) {
-            $urls[] = [$site->absolute($content->publicPath()), optional($content->updated_at)->toAtomString()];
-        });
+        try {
+            $baseHost = parse_url($site->absolute('/'), PHP_URL_HOST);
+            Content::query()->public()
+                ->where('robots_index', true)
+                ->whereIn('type', ['page', 'post', 'guide'])
+                ->orderBy('id')
+                ->each(function (Content $content) use (&$urls, $site, $baseHost) {
+                    if ($this->canonicalLeavesHost($content->canonical, $baseHost)) {
+                        return;
+                    }
+                    $urls[] = [$site->absolute($content->publicPath()), optional($content->updated_at)->toAtomString()];
+                });
+        } catch (\Throwable) {
+            // Static pages still ship if the content table is missing.
+        }
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">';
@@ -39,6 +51,16 @@ class SitemapController extends Controller
             'Content-Type' => 'application/xml; charset=UTF-8',
             'Cache-Control' => 'public, max-age=300',
         ]);
+    }
+
+    private function canonicalLeavesHost(?string $canonical, ?string $baseHost): bool
+    {
+        if (! $canonical || ! str_starts_with($canonical, 'http')) {
+            return false;
+        }
+        $host = parse_url($canonical, PHP_URL_HOST);
+
+        return is_string($host) && is_string($baseHost) && strcasecmp($host, $baseHost) !== 0;
     }
 
     private function mtime(string $path): ?string
