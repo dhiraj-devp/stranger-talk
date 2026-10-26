@@ -11,6 +11,7 @@
                     <a class="btn btn-primary" href="{{ route('login') }}">Start Video Chat</a>
                     <a class="btn btn-ghost" href="#how">How it works</a>
                 </div>
+                <p class="home-links"><a href="/random-video-chat">Random video chat</a><a href="/talk-to-strangers">Talk to strangers</a><a href="/omegle-alternative">Omegle alternative</a><a href="/features">Features</a><a href="/help">Help</a></p>
             </div>
             <div class="home-preview">
                 @include('partials.call-preview')
