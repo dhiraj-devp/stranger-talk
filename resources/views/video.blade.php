@@ -16,6 +16,32 @@
             <p id="status" role="status">Allow camera and microphone</p>
             <p id="quality" hidden></p>
         </div>
+        <details class="prefs">
+            <summary>
+                <span class="prefs-kicker">Preferences</span>
+                <span id="pref-summary">{{ $preference->summary() }}</span>
+            </summary>
+            <form id="pref-form" class="prefs-card">
+                <p class="prefs-title">Who you want to meet</p>
+                <p class="prefs-lead">This choice is saved to your account and is how new matches are chosen.</p>
+                <label for="gender_preference">Gender</label>
+                <select id="gender_preference" name="gender_preference">
+                    @foreach (['anyone' => 'Anyone', 'male' => 'Male', 'female' => 'Female', 'other' => 'Other'] as $value => $label)
+                        <option value="{{ $value }}" @selected($preference->gender_preference === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <label for="country_preference">Country</label>
+                <select id="country_preference" name="country_preference">
+                    <option value="any" @selected($preference->country_preference === null)>Any Country</option>
+                    @foreach ($countries as $code => $name)
+                        <option value="{{ $code }}" @selected($preference->country_preference === $code)>{{ \App\Support\Countries::flag($code) }} {{ $name }}</option>
+                    @endforeach
+                </select>
+                <p class="fine">@if (config('features.preference_matching')) Used when pairing. Anyone and any country stay open. @else Saved for later. Matching does not use this until the feature is turned on. @endif</p>
+                <p id="pref-state" class="fine" role="status"></p>
+                <button type="submit">Save preferences</button>
+            </form>
+        </details>
         <details class="more">
             <summary aria-label="More options" title="More">More</summary>
             <div class="more-panel">
@@ -38,12 +64,32 @@
     </header>
 
     <div class="workspace">
+        @php
+            $me = auth()->user();
+            $meCountry = \App\Support\Countries::valid($me->country_code) ? \App\Support\Countries::label($me->country_code) : '';
+        @endphp
         <div class="stage">
-            <video id="remote" autoplay playsinline></video>
-            <p class="tag remote-tag">Stranger</p>
-            <div id="local-wrap" class="local-wrap">
+            <section class="pane" id="remote-pane">
+                <video id="remote" autoplay playsinline></video>
+                <div class="pane-loading" id="remote-loading">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <p>Finding someone</p>
+                </div>
+                <p class="identity">
+                    <strong id="remote-name">Finding a match</strong>
+                    <span id="remote-country"></span>
+                </p>
+            </section>
+            <div id="local-wrap" class="pane local-wrap">
                 <video id="local" autoplay playsinline muted></video>
-                <p class="tag">You</p>
+                <div class="pane-loading" id="local-loading">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <p>Finding someone</p>
+                </div>
+                <p class="identity">
+                    <strong id="local-name">{{ $me->name }}</strong>
+                    <span id="local-country">{{ $meCountry }}</span>
+                </p>
                 <p id="local-state" class="local-state" aria-live="polite"></p>
             </div>
             <p id="audio-tip" class="audio-tip" hidden>Tap to hear the other person</p>
@@ -62,7 +108,7 @@
                 <textarea id="chat-input" maxlength="500" rows="2" placeholder="Waiting for a match" disabled></textarea>
                 <button id="chat-send" type="submit" disabled>Send</button>
             </form>
-            <p class="chat-note">Saved with this match for {{ (int) config('platform.retention.match_events_days', 90) }} days. Not end-to-end encrypted.</p>
+            <p class="chat-note">Saved with this match for {{ (int) config('platform.retention.match_events_days', 90) }} days.</p>
         </aside>
     </div>
 
@@ -71,10 +117,6 @@
             <button id="mute" type="button" title="Mute microphone" aria-label="Mute microphone" disabled>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 6 6.9V21H9v2h6v-2h-2v-2.1A7 7 0 0 0 19 12h-2a5 5 0 0 1-10 0H5Z"/></svg>
                 <span>Mute</span>
-            </button>
-            <button id="camera" type="button" title="Turn camera off" aria-label="Turn camera off" disabled>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11a2 2 0 0 1 2 2v1.2l3-1.8v9.2l-3-1.8V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg>
-                <span>Camera</span>
             </button>
             <button id="chat-toggle" type="button" title="Chat" aria-label="Chat" aria-expanded="false" aria-controls="chat-panel">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>
@@ -107,26 +149,6 @@
             <button id="report-send" type="submit">Send report</button>
         </form>
 
-        <details class="prefs">
-            <summary>Match Preferences <span id="pref-summary">{{ $preference->summary() }}</span></summary>
-            <form id="pref-form">
-                <label for="gender_preference">Gender</label>
-                <select id="gender_preference" name="gender_preference">
-                    @foreach (['anyone' => 'Anyone', 'male' => 'Male', 'female' => 'Female', 'other' => 'Other'] as $value => $label)
-                        <option value="{{ $value }}" @selected($preference->gender_preference === $value)>{{ $label }}</option>
-                    @endforeach
-                </select>
-                <label for="country_preference">Country</label>
-                <select id="country_preference" name="country_preference">
-                    <option value="any" @selected($preference->country_preference === null)>Any Country</option>
-                    @foreach ($countries as $code => $name)
-                        <option value="{{ $code }}" @selected($preference->country_preference === $code)>{{ \App\Support\Countries::flag($code) }} {{ $name }}</option>
-                    @endforeach
-                </select>
-                <p class="fine">@if (config('features.preference_matching')) Preferences are used when pairing. @else Preferences are saved. They do not change matching yet. @endif</p>
-                <button type="submit">Save Preferences</button>
-            </form>
-        </details>
     </div>
 
     <script type="application/json" id="ice-servers">@json($iceServers)</script>

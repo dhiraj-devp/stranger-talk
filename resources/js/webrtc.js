@@ -47,14 +47,34 @@ muteBtn.addEventListener('click', () => {
     label(muteBtn, micOn ? 'Mute' : 'Unmute', !micOn);
 });
 
-cameraBtn.addEventListener('click', () => {
-    if (!localStream) return;
-    camOn = !camOn;
-    localStream.getVideoTracks().forEach((track) => {
-        track.enabled = camOn;
+if (cameraBtn) {
+    cameraBtn.addEventListener('click', () => {
+        if (!localStream) return;
+        camOn = !camOn;
+        localStream.getVideoTracks().forEach((track) => {
+            track.enabled = camOn;
+        });
+        label(cameraBtn, camOn ? 'Camera' : 'Camera off', !camOn);
     });
-    label(cameraBtn, camOn ? 'Camera' : 'Camera off', !camOn);
-});
+}
+
+function cameraReady(ready) {
+    if (cameraBtn) cameraBtn.disabled = !ready;
+}
+
+function paintPartner(data) {
+    const nameEl = document.getElementById('remote-name');
+    const countryEl = document.getElementById('remote-country');
+    if (!nameEl) return;
+    const partner = data && data.partner;
+    if (partner && partner.name) {
+        nameEl.textContent = partner.name;
+        if (countryEl) countryEl.textContent = partner.country || '';
+    } else {
+        nameEl.textContent = 'Finding a match';
+        if (countryEl) countryEl.textContent = '';
+    }
+}
 
 nextBtn.addEventListener('click', onNext);
 endBtn.addEventListener('click', onEnd);
@@ -134,7 +154,7 @@ async function start() {
     nextBtn.disabled = false;
     endBtn.disabled = false;
     muteBtn.disabled = true;
-    cameraBtn.disabled = true;
+    cameraReady(false);
     audioTip.hidden = true;
     searchingAgain = false;
     if (window.RoomState) window.RoomState.set('permissions');
@@ -148,7 +168,7 @@ async function start() {
 
         await ensureMedia();
         muteBtn.disabled = false;
-        cameraBtn.disabled = false;
+        cameraReady(true);
         setStatus('Finding someone...');
         const data = await api('/match/find', {
             method: 'POST',
@@ -175,6 +195,8 @@ async function onNext() {
     const previousToken = pageToken;
     pageToken = newToken();
     announce('reset');
+    document.body.classList.add('is-skipping');
+    paintPartner(null);
     closePeer();
     stopMedia();
     resetPeerState();
@@ -191,7 +213,7 @@ async function onNext() {
         joined = true;
         await ensureMedia();
         muteBtn.disabled = false;
-        cameraBtn.disabled = false;
+        cameraReady(true);
         stopped = false;
         endingUi = false;
         await applyState(data);
@@ -283,10 +305,13 @@ async function applyState(data) {
     if (data.status === 'waiting') {
         setStatus('Finding someone...');
         announce('waiting');
+        paintPartner(null);
         return;
     }
 
     announce(data.status);
+    paintPartner(data);
+    if (data.status === 'connected') document.body.classList.remove('is-skipping');
 
     if (data.status === 'connected' || (pc && pc.connectionState === 'connected')) {
         setStatus('Connected');
@@ -447,7 +472,9 @@ function failCall(message, notify) {
     stopMedia();
     statusEl.textContent = message;
     statusEl.classList.add('is-error');
+    document.body.classList.remove('is-skipping');
     announce('ended');
+    paintPartner(null);
     paintQuality('', false);
     if (window.RoomState) {
         const lower = String(message).toLowerCase();
@@ -462,7 +489,7 @@ function failCall(message, notify) {
     againBtn.hidden = false;
     nextBtn.disabled = true;
     muteBtn.disabled = true;
-    cameraBtn.disabled = true;
+    cameraReady(false);
     endBtn.disabled = false;
     if (notify && joined) beacon(pageToken);
 }
@@ -527,7 +554,7 @@ async function ensureMedia() {
     micOn = true;
     camOn = true;
     label(muteBtn, 'Mute', false);
-    label(cameraBtn, 'Camera', false);
+    if (cameraBtn) label(cameraBtn, 'Camera', false);
 }
 
 function resetPeerState() {
@@ -623,7 +650,7 @@ window.__reacquireMedia = async function () {
     stopMedia();
     await ensureMedia();
     muteBtn.disabled = false;
-    cameraBtn.disabled = false;
+    cameraReady(true);
     if (!pc || !localStream) return;
     const senders = pc.getSenders();
     localStream.getTracks().forEach((track) => {

@@ -162,7 +162,10 @@ class VideoChatTest extends TestCase
             ->assertSee('room-state.js', false)
             ->assertSee('id="chat-toggle"', false)
             ->assertSee('id="chat-log"', false)
-            ->assertSee('chat.js', false);
+            ->assertSee('chat.js', false)
+            ->assertSee($user->name)
+            ->assertDontSee('end-to-end', false)
+            ->assertDontSee('id="camera"', false);
     }
 
     public function test_match_chat_is_isolated_ordered_and_closed_when_the_match_ends(): void
@@ -261,7 +264,8 @@ class VideoChatTest extends TestCase
         $this->actingAs($a)->postJson('/match/find', ['token' => 'token-a'])->assertJsonPath('status', 'waiting');
         $this->actingAs($b)->postJson('/match/find', ['token' => 'token-b'])
             ->assertJsonPath('status', 'connecting')
-            ->assertJsonPath('role', 'answerer');
+            ->assertJsonPath('role', 'answerer')
+            ->assertJsonPath('partner.name', $a->name);
 
         return [$a, $b];
     }

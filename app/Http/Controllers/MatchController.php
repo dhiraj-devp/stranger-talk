@@ -9,6 +9,7 @@ use App\Models\VideoMatch;
 use App\Services\AnalyticsRecorder;
 use App\Services\MatchmakingService;
 use App\Services\PresenceService;
+use App\Support\Countries;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -397,10 +398,23 @@ class MatchController extends Controller
             }
         }
 
+        $partner = null;
+        if ($paired) {
+            $partnerId = $match->user_one_id === $user->id ? $match->user_two_id : $match->user_one_id;
+            $partnerUser = User::query()->find($partnerId, ['id', 'name', 'country_code']);
+            if ($partnerUser) {
+                $partner = [
+                    'name' => $partnerUser->name,
+                    'country' => Countries::valid($partnerUser->country_code) ? Countries::label($partnerUser->country_code) : '',
+                ];
+            }
+        }
+
         return [
             'status' => $match->status,
             'role' => $role,
             'end_reason' => $match->end_reason,
+            'partner' => $partner,
             'offer' => $role === 'answerer' ? ($signal['offer'] ?? null) : null,
             'answer' => $role === 'offerer' ? ($signal['answer'] ?? null) : null,
             'candidates' => $outgoing,
