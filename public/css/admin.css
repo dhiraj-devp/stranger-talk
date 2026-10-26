@@ -90,6 +90,20 @@ button.secondary { background: white; }
 .pager { margin-top: 14px; }
 .pager nav, .pager .pagination { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .pager a, .pager span { color: var(--text); }
+.xy { margin: 8px 0 20px; background: white; border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 8px; }
+.xy svg { width: 100%; height: auto; display: block; }
+.xy line { stroke: #e6e8ee; stroke-width: 1; }
+.xy .axis { stroke: #c5ced9; }
+.xy text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.xy polyline { fill: none; stroke-width: 2; }
+.xy .series-views { stroke: var(--accent); fill: var(--accent); }
+.xy polyline.series-views { fill: none; }
+.xy .series-uniques { stroke: var(--ok); fill: var(--ok); }
+.xy polyline.series-uniques { fill: none; }
+.xy figcaption { display: flex; gap: 16px; margin-top: 8px; color: var(--muted); font-size: 0.82rem; }
+.xy .swatch { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 99px; }
+.xy .swatch.views { background: var(--accent); }
+.xy .swatch.uniques { background: var(--ok); }
 .bars { display: grid; gap: 6px; margin: 8px 0 16px; }
 .bars div { display: grid; grid-template-columns: 92px 1fr 48px; gap: 8px; align-items: center; font-size: 0.8rem; color: var(--muted); }
 .bars span { display: block; height: 8px; border-radius: 99px; background: #eef2f6; overflow: hidden; }

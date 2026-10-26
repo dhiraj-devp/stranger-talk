@@ -17,20 +17,16 @@
         <a class="btn" href="{{ route('admin.analytics.export', ['section' => $section, 'from' => $from, 'to' => $to]) }}">Export CSV</a>
     </form>
     @if ($section === 'traffic')
-        @php $max = max(1, collect($traffic['days'])->max('value')); @endphp
         <h2>Page views by day</h2>
-        <div class="bars" aria-label="Page views by day">
-            @foreach ($traffic['days'] as $point)
-                <div><b>{{ $point['label'] }}</b><span><i style="width: {{ (int) round($point['value'] / $max * 100) }}%"></i></span>{{ $point['value'] }} <small>{{ $point['uniques'] }} unique</small></div>
-            @endforeach
-        </div>
-        @php $hourMax = max(1, collect($traffic['hours'])->max('views')); @endphp
+        @include('admin.partials.xy-chart', [
+            'label' => 'Page views by day',
+            'points' => array_map(fn (array $point) => ['label' => $point['label'], 'views' => $point['value'], 'uniques' => $point['uniques']], $traffic['days']),
+        ])
         <h2>Hours on {{ $traffic['day'] }}</h2>
-        <div class="bars" aria-label="Page views by hour">
-            @foreach ($traffic['hours'] as $point)
-                <div><b>{{ $point['label'] }}</b><span><i style="width: {{ (int) round($point['views'] / $hourMax * 100) }}%"></i></span>{{ $point['views'] }} <small>{{ $point['uniques'] }} unique</small></div>
-            @endforeach
-        </div>
+        @include('admin.partials.xy-chart', [
+            'label' => 'Page views by hour',
+            'points' => $traffic['hours'],
+        ])
     @elseif ($section === 'overview' && $series->isNotEmpty())
         @php $max = max(1, $series->max('value')); @endphp
         <div class="bars" aria-label="Visits by day">
