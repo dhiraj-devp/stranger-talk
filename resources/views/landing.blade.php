@@ -6,7 +6,7 @@
         <section class="hero">
             <div class="hero-copy">
                 <p class="eyebrow">Meet the world, one conversation at a time</p>
-                <h1>The world is full of people you haven't met yet.</h1>
+                <h1>One-to-One Video Chat with Strangers.</h1>
                 <p>Meet someone new through a spontaneous one-to-one video conversation. No endless feeds. Just real-time conversations with people around the world.</p>
                 <div class="hero-actions">
                     <a class="btn btn-primary" href="{{ route('login') }}">Start Video Chat</a>
