@@ -1,5 +1,7 @@
 @extends('layouts.admin')
 
+@section('crumb', 'User')
+
 @section('content')
     <h1>{{ $user->name }}</h1>
     <p class="lead">{{ $user->email }} · {{ $user->country_code ?: 'No country' }} · {{ $user->gender ?: 'No gender' }}</p>
@@ -9,7 +11,7 @@
     @if ($user->ban_reason)<p>Ban reason: {{ $user->ban_reason }}</p>@endif
 
     @if (auth()->user()->staffRole() === 'admin')
-        <form class="panel stack" method="POST" action="{{ route('admin.users.update', $user) }}">
+        <form class="panel stack" method="POST" action="{{ route('admin.users.update', $user) }}" data-confirm="Save this account, including the selected role?">
             @csrf
             <h2>Account</h2>
             <label for="name">Name <input id="name" name="name" value="{{ $user->name }}" required></label>
@@ -41,7 +43,7 @@
     @endif
 
     <div class="split">
-        <form class="panel" method="POST" action="{{ route('admin.users.ban', $user) }}">
+        <form class="panel" method="POST" action="{{ route('admin.users.ban', $user) }}" data-confirm="Ban this user and end their active matches?">
             @csrf
             <h2>Ban</h2>
             <label for="reason">Reason</label>
@@ -53,7 +55,7 @@
             <textarea id="notes" name="notes" maxlength="1000"></textarea>
             <button type="submit" class="danger">Ban user</button>
         </form>
-        <form class="panel" method="POST" action="{{ route('admin.users.unban', $user) }}">
+        <form class="panel" method="POST" action="{{ route('admin.users.unban', $user) }}" data-confirm="Lift this ban?">
             @csrf
             <h2>Restore access</h2>
             <p class="lead">Clears the ban and lets this person match again.</p>
@@ -82,7 +84,8 @@
         @endforelse
     </section>
 
-    <form class="panel" method="POST" action="{{ route('admin.users.destroy', $user) }}" style="margin-top:16px">
+    @if (auth()->id() !== $user->id)
+    <form class="panel" method="POST" action="{{ route('admin.users.destroy', $user) }}" style="margin-top:16px" data-confirm="Delete this account permanently?">
         @csrf
         @method('DELETE')
         <h2>Delete account</h2>
@@ -90,4 +93,5 @@
         <input id="confirm_email" name="confirm_email" type="email" required>
         <button type="submit" class="danger">Delete user</button>
     </form>
+    @endif
 @endsection

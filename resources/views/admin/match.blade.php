@@ -1,5 +1,7 @@
 @extends('layouts.admin')
 
+@section('crumb', 'Match')
+
 @section('content')
     <h1>Match #{{ $match->id }}</h1>
     <p class="lead">{{ $match->status }} · {{ $match->end_reason ?: 'open' }} · {{ $seconds }} seconds. Media is not stored.</p>

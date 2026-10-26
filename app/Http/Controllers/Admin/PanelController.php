@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AnalyticsEvent;
 use App\Models\AuditLog;
+use App\Models\DailyMetric;
 use App\Models\Ban;
 use App\Models\MatchEvent;
 use App\Models\Report;
@@ -31,6 +32,10 @@ class PanelController extends Controller
                 ->latest()
                 ->limit(5)
                 ->get(),
+            'recentAudit' => AuditLog::query()->with('admin:id,name')->latest('id')->limit(5)->get(),
+            'health' => app(\App\Http\Controllers\HealthController::class)()->getData(true),
+            'needsReview' => Report::query()->select('reported_user_id')->where('status', Report::PENDING)->where('created_at', '>=', now()->subDay())->groupBy('reported_user_id')->havingRaw('count(*) >= 3')->count(),
+            'visitTrend' => $this->visitTrend(),
         ]);
     }
 
@@ -52,16 +57,32 @@ class PanelController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $status = (string) $request->query('status', '');
+        $role = (string) $request->query('role', '');
+        $sort = in_array($request->query('sort'), ['name', 'email', 'created_at', 'last_seen_at', 'status'], true) ? $request->query('sort') : 'created_at';
+        $dir = $request->query('dir') === 'asc' ? 'asc' : 'desc';
         $users = User::query()
-            ->when($q !== '', fn ($query) => $query->where(function ($query) use ($q) {
-                $query->where('name', 'like', "%{$q}%")->orWhere('email', 'like', "%{$q}%");
-            }))
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($query) use ($q) {
+                    $query->where('name', 'like', "%{$q}%")->orWhere('email', 'like', "%{$q}%");
+                    if (ctype_digit($q)) {
+                        $query->orWhere('id', (int) $q);
+                    }
+                });
+            })
             ->when(in_array($status, [User::ACTIVE, User::OFFLINE, User::SEARCHING, User::IN_CALL, User::BANNED], true), fn ($query) => $query->where('status', $status))
-            ->latest()
+            ->when(in_array($role, ['member', 'analyst', 'moderator', 'admin'], true), function ($query) use ($role) {
+                $role === 'admin'
+                    ? $query->where(fn ($query) => $query->where('is_admin', true)->orWhere('role', 'admin'))
+                    : $query->where('role', $role)->where('is_admin', false);
+            })
+            ->when($request->filled('country'), fn ($query) => $query->where('country_code', strtoupper((string) $request->query('country'))))
+            ->when(in_array($request->query('gender'), User::GENDERS, true), fn ($query) => $query->where('gender', $request->query('gender')))
+            ->when($request->filled('from'), fn ($query) => $query->where('created_at', '>=', $request->date('from')))
+            ->orderBy($sort, $dir)
             ->paginate(20)
             ->withQueryString();
 
-        return view('admin.users', ['users' => $users, 'q' => $q, 'status' => $status]);
+        return view('admin.users', ['users' => $users, 'q' => $q, 'status' => $status, 'role' => $role, 'sort' => $sort, 'dir' => $dir]);
     }
 
     public function showUser(User $user): View
@@ -111,10 +132,17 @@ class PanelController extends Controller
             'role' => ['required', 'in:member,analyst,moderator,admin'],
             'status' => ['required', 'in:active,offline,searching,in_call,banned'],
         ]);
+        if ($user->is($request->user()) && $data['role'] !== 'admin') {
+            return back()->withErrors(['role' => 'You cannot remove your own admin access.']);
+        }
+        $adminCount = User::query()->where('is_admin', true)->orWhere('role', 'admin')->count();
+        if ($user->staffRole() === 'admin' && $data['role'] !== 'admin' && $adminCount <= 1) {
+            return back()->withErrors(['role' => 'The last administrator cannot be demoted.']);
+        }
         $user->forceFill([
             'name' => $data['name'],
-            'gender' => $data['gender'] ?: null,
-            'country_code' => $data['country_code'] ? strtoupper($data['country_code']) : null,
+            'gender' => ($data['gender'] ?? null) ?: null,
+            'country_code' => ! empty($data['country_code']) ? strtoupper($data['country_code']) : null,
             'role' => $data['role'],
             'status' => $data['status'],
             'is_admin' => $data['role'] === 'admin',
@@ -132,6 +160,10 @@ class PanelController extends Controller
         $data = $request->validate(['confirm_email' => ['required', 'email']]);
         if ($user->id === $request->user()->id || strcasecmp($data['confirm_email'], $user->email) !== 0) {
             return back()->withErrors(['confirm_email' => 'Type the user email to confirm deletion.']);
+        }
+        $admins = User::query()->where(fn ($query) => $query->where('is_admin', true)->orWhere('role', 'admin'))->count();
+        if ($user->staffRole() === 'admin' && $admins <= 1) {
+            return back()->withErrors(['confirm_email' => 'The last administrator cannot be deleted.']);
         }
 
         \App\Models\AuditLog::write($request->user(), 'delete_user', $user, [], $request->ip());
@@ -198,29 +230,62 @@ class PanelController extends Controller
         return back()->with('status', 'Report updated.');
     }
 
-    public function bans(): View
+    public function bans(Request $request): View
     {
-        return view('admin.bans', [
-            'bans' => Ban::query()->with(['user:id,name,email', 'admin:id,name'])->latest()->paginate(25),
-        ]);
+        $state = (string) $request->query('state', '');
+        $q = trim((string) $request->query('q', ''));
+        $bans = Ban::query()->with(['user:id,name,email', 'admin:id,name'])
+            ->when($q !== '', fn ($query) => $query->whereHas('user', fn ($query) => $query->where('name', 'like', "%{$q}%")->orWhere('email', 'like', "%{$q}%")))
+            ->when($state === 'lifted', fn ($query) => $query->whereNotNull('lifted_at'))
+            ->when($state === 'permanent', fn ($query) => $query->whereNull('lifted_at')->where('permanent', true))
+            ->when($state === 'active', fn ($query) => $query->whereNull('lifted_at')->where(fn ($query) => $query->where('permanent', true)->orWhere('banned_until', '>', now())->orWhereNull('banned_until')))
+            ->when($state === 'expired', fn ($query) => $query->whereNull('lifted_at')->where('permanent', false)->where('banned_until', '<', now()))
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('admin.bans', ['bans' => $bans, 'state' => $state, 'q' => $q]);
     }
 
-    public function matches(): View
+    public function matches(Request $request): View
     {
-        return view('admin.matches', [
-            'matches' => VideoMatch::query()
-                ->select(['id', 'user_one_id', 'user_two_id', 'status', 'end_reason', 'created_at', 'updated_at'])
-                ->with(['userOne:id,name', 'userTwo:id,name'])
-                ->latest()
-                ->paginate(25),
-        ]);
+        $status = (string) $request->query('status', '');
+        $reason = (string) $request->query('end_reason', '');
+        $matches = VideoMatch::query()
+            ->select(['id', 'user_one_id', 'user_two_id', 'status', 'end_reason', 'created_at', 'updated_at', 'ended_at'])
+            ->with(['userOne:id,name', 'userTwo:id,name'])
+            ->when(in_array($status, ['waiting', 'connecting', 'connected', 'ended', 'failed', 'expired'], true), fn ($query) => $query->where('status', $status))
+            ->when(in_array($reason, ['end', 'next', 'disconnect'], true), fn ($query) => $query->where('end_reason', $reason))
+            ->when($request->filled('from'), fn ($query) => $query->where('created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($query) => $query->where('created_at', '<=', $request->date('to')->endOfDay()))
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('admin.matches', compact('matches', 'status', 'reason'));
     }
 
-    public function audit(): View
+    public function audit(Request $request): View
     {
         return view('admin.audit', [
-            'logs' => AuditLog::query()->with('admin:id,name')->latest('id')->paginate(30),
+            'logs' => $this->auditQuery($request)->paginate(30)->withQueryString(),
+            'action' => (string) $request->query('action', ''),
+            'q' => trim((string) $request->query('q', '')),
         ]);
+    }
+
+    public function exportAudit(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        AuditLog::write($request->user(), 'export_audit', null, [], $request->ip());
+
+        return response()->streamDownload(function () use ($request) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['When', 'Admin', 'Action', 'Target', 'IP']);
+            $this->auditQuery($request)->limit(5000)->get()->each(function (AuditLog $log) use ($out) {
+                fputcsv($out, [$log->created_at, $log->admin->name ?? '', $log->action, trim($log->target_type.' '.$log->target_id), $log->ip_address]);
+            });
+            fclose($out);
+        }, 'audit.csv', ['Content-Type' => 'text/csv']);
     }
 
     public function health(): View
@@ -275,7 +340,7 @@ class PanelController extends Controller
         }
         $limits = [];
         foreach (array_keys(config('platform.limits')) as $key) {
-            $limits[$key] = max(1, (int) $request->input('limits.'.$key, config('platform.limits.'.$key)));
+            $limits[$key] = min(10000, max(1, (int) $request->input('limits.'.$key, config('platform.limits.'.$key))));
         }
         $settings = \App\Models\PlatformSetting::current();
         $settings->fill([
@@ -291,6 +356,47 @@ class PanelController extends Controller
         ], $request->ip());
 
         return back()->with('status', 'Settings saved.');
+    }
+
+    private function visitTrend()
+    {
+        try {
+            $rows = DailyMetric::query()
+                ->where('metric', 'visits')
+                ->where('dimension', '')
+                ->where('date', '>=', now()->subDays(6)->toDateString())
+                ->orderBy('date')
+                ->get()
+                ->keyBy(fn ($row) => $row->date->toDateString());
+        } catch (\Throwable) {
+            return collect();
+        }
+
+        return collect(range(6, 0))->map(function (int $daysAgo) use ($rows) {
+            $date = now()->subDays($daysAgo)->toDateString();
+
+            return ['label' => $date, 'value' => (int) ($rows[$date]->value ?? 0)];
+        });
+    }
+
+    private function auditQuery(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $action = (string) $request->query('action', '');
+
+        return AuditLog::query()->with('admin:id,name')
+            ->when($action !== '', fn ($query) => $query->where('action', $action))
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($query) use ($q) {
+                    $query->where('action', 'like', "%{$q}%")->orWhere('target_type', 'like', "%{$q}%");
+                    if (ctype_digit($q)) {
+                        $query->orWhere('target_id', (int) $q)->orWhere('admin_id', (int) $q);
+                    }
+                });
+            })
+            ->when($request->filled('from'), fn ($query) => $query->where('created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($query) => $query->where('created_at', '<=', $request->date('to')->endOfDay()))
+            ->latest('id');
     }
 
     private function freshGoogle(Request $request): ?RedirectResponse

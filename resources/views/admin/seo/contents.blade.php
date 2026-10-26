@@ -2,6 +2,12 @@
 
 @section('content')
     <h1>Content</h1>
+    <nav class="tabs" aria-label="Content type">
+        <a href="{{ route('admin.content') }}" @class(['is-on' => $type === ''])>All</a>
+        @foreach (['page' => 'Pages', 'post' => 'Posts', 'guide' => 'Guides'] as $value => $label)
+            <a href="{{ route('admin.content', ['type' => $value]) }}" @class(['is-on' => $type === $value])>{{ $label }}</a>
+        @endforeach
+    </nav>
     <p class="lead"><a href="{{ route('admin.content.create') }}">New page</a></p>
     <section class="panel">
         <table>

@@ -317,6 +317,58 @@ class PlatformTest extends TestCase
         $this->assertSame(VideoMatch::EXPIRED, $match->fresh()->status);
     }
 
+    public function test_control_center_access_filters_and_step_up(): void
+    {
+        $admin = User::factory()->create(['name' => 'Ada Admin']);
+        $admin->forceFill(['is_admin' => true, 'role' => 'admin'])->save();
+        $moderator = User::factory()->create();
+        $moderator->forceFill(['role' => 'moderator', 'is_admin' => false])->save();
+        $analyst = User::factory()->create();
+        $analyst->forceFill(['role' => 'analyst', 'is_admin' => false])->save();
+        $member = User::factory()->create(['name' => 'Member One']);
+
+        $this->actingAs($member)->get('/admin/users')->assertForbidden();
+        $this->actingAs($analyst)->get('/admin/users')->assertForbidden();
+        $this->actingAs($analyst)->get('/admin/analytics')->assertOk()->assertSee('Control center');
+        $this->actingAs($moderator)->get('/admin')->assertOk()->assertSee('Pending reports');
+        $this->actingAs($moderator)->get('/admin/users')->assertOk()->assertSee('All users');
+        $this->actingAs($moderator)->get('/admin/settings')->assertForbidden();
+        $this->actingAs($moderator)->get('/admin/audit')->assertForbidden();
+
+        $this->actingAs($admin)->get('/admin/users?q='.$member->id)->assertOk()->assertSee('Member One');
+        $this->actingAs($admin)->get('/admin/users?role=admin')->assertOk()->assertSee('Ada Admin');
+        $this->actingAs($admin)->get('/admin/settings')->assertOk()->assertSee('Matching rules');
+        $this->actingAs($admin)->get('/admin/health')->assertOk()->assertSee('Healthy');
+        $this->actingAs($admin)->get('/admin/content?type=page')->assertOk()->assertSee('Pages');
+        $this->actingAs($admin)->get('/admin/audit/export')->assertOk();
+        $this->assertTrue(AuditLog::query()->where('action', 'export_audit')->exists());
+
+        $this->actingAs($admin)->post('/admin/users/'.$admin->id, [
+            'name' => 'Ada Admin',
+            'role' => 'member',
+            'status' => 'active',
+        ])->assertSessionHasErrors('role');
+        $this->assertSame('admin', $admin->fresh()->staffRole());
+
+        $other = User::factory()->create();
+        $other->forceFill(['is_admin' => true, 'role' => 'admin'])->save();
+        $this->actingAs($admin)->post('/admin/users/'.$other->id, [
+            'name' => $other->name,
+            'role' => 'moderator',
+            'status' => 'active',
+        ])->assertRedirect();
+        $this->assertSame('moderator', $other->fresh()->role);
+        $this->assertFalse((bool) $other->fresh()->is_admin);
+        $this->assertTrue(AuditLog::query()->where('action', 'update_user')->exists());
+
+        config(['services.google.client_id' => 'test-client']);
+        $this->actingAs($admin)->post('/admin/users/'.$member->id.'/ban', [
+            'reason' => 'spam',
+            'hours' => 1,
+        ])->assertRedirect(route('auth.google.stepup'));
+        $this->assertFalse($member->fresh()->isBanned());
+    }
+
     private function fakeGoogle(array $map = [], array $raw = [], ?\Throwable $error = null): void
     {
         config([

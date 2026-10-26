@@ -150,8 +150,11 @@ class SeoController extends Controller
 
     public function contents(): View
     {
+        $type = (string) request()->query('type', '');
+
         return view('admin.seo.contents', [
-            'contents' => Content::query()->latest('updated_at')->paginate(20),
+            'contents' => Content::query()->when(in_array($type, ['page', 'post', 'guide', 'faq'], true), fn ($query) => $query->where('type', $type))->latest('updated_at')->paginate(20)->withQueryString(),
+            'type' => $type,
             'categories' => ContentCategory::query()->orderBy('name')->get(),
             'tags' => Tag::query()->orderBy('name')->get(),
             'authors' => Author::query()->orderBy('name')->get(),

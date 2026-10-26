@@ -1,7 +1,9 @@
 @extends('layouts.admin')
 
+@section('crumb', 'Live operations')
+
 @section('content')
-    <h1>Live</h1>
+    <h1>Live operations</h1>
     <p class="lead">People searching and calls in progress. No video or audio is shown.</p>
     <div class="split">
         <section class="panel">
@@ -26,7 +28,7 @@
                 <tbody>
                 @forelse ($calls as $match)
                     <tr>
-                        <td>#{{ $match->id }}</td>
+                        <td><a href="{{ route('admin.matches.show', $match) }}">#{{ $match->id }}</a></td>
                         <td>{{ $match->userOne->name ?? 'User' }} / {{ $match->userTwo->name ?? 'Waiting' }}</td>
                         <td><span class="badge ok">{{ $match->status }}</span></td>
                     </tr>

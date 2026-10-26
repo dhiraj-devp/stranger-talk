@@ -105,6 +105,7 @@ Route::middleware(['auth', 'active'])->prefix('admin')->name('admin.')->group(fu
     Route::get('/settings', [PanelController::class, 'settings'])->name('settings');
     Route::post('/settings', [PanelController::class, 'updateSettings'])->name('settings.update');
     Route::get('/audit', [PanelController::class, 'audit'])->name('audit');
+    Route::get('/audit/export', [PanelController::class, 'exportAudit'])->name('audit.export');
     Route::get('/health', [PanelController::class, 'health'])->name('health');
     Route::get('/seo', [SeoController::class, 'overview'])->name('seo');
     Route::get('/seo/settings', [SeoController::class, 'settings'])->name('seo.edit');

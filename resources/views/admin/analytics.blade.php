@@ -1,8 +1,10 @@
 @extends('layouts.admin')
 
+@section('crumb', 'Analytics')
+
 @section('content')
-    <h1>Analytics</h1>
-    <p class="lead">First-party counts for {{ $from }} to {{ $to }}. Empty days stay at zero.</p>
+    <h1>{{ ucfirst($section) }}</h1>
+    <p class="lead">Cookie visits are separate from signed-in events. {{ $from }} to {{ $to }}. Days without rows stay at zero. The previous window is the same number of days before this range.</p>
     <nav class="tabs" aria-label="Analytics">
         @foreach ($sections as $item)
             <a href="{{ route('admin.analytics', ['section' => $item, 'from' => $from, 'to' => $to]) }}" @class(['is-on' => $section === $item])>{{ ucfirst($item) }}</a>
@@ -14,9 +16,23 @@
         <button type="submit">Apply</button>
         <a class="btn" href="{{ route('admin.analytics.export', ['section' => $section, 'from' => $from, 'to' => $to]) }}">Export CSV</a>
     </form>
+    @if ($section === 'overview' && $series->isNotEmpty())
+        @php $max = max(1, $series->max('value')); @endphp
+        <div class="bars" aria-label="Visits by day">
+            @foreach ($series as $point)
+                <div><b>{{ $point['label'] }}</b><span><i style="width: {{ (int) round($point['value'] / $max * 100) }}%"></i></span>{{ $point['value'] }}</div>
+            @endforeach
+        </div>
+    @endif
     <section class="metrics">
         @foreach ($cards as $label => $value)
-            <article><span>{{ $label }}</span><strong>{{ number_format($value) }}</strong></article>
+            <article>
+                <span>{{ $label }}</span>
+                <strong>{{ number_format($value) }}</strong>
+                @if (array_key_exists($label, $previous))
+                    <small>Previous {{ number_format($previous[$label]) }}</small>
+                @endif
+            </article>
         @endforeach
     </section>
     <section class="panel">

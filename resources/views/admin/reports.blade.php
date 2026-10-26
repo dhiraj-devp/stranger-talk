@@ -1,7 +1,10 @@
 @extends('layouts.admin')
 
+@section('crumb', 'Reports')
+
 @section('content')
-    <h1>Reports</h1>
+    <h1>Report queue</h1>
+    <p class="lead">Three or more pending reports in 24 hours are marked Needs review. That does not ban anyone.</p>
     <form class="filters" method="GET">
         <input type="hidden" name="status" value="{{ $status }}">
         <label>Reason
@@ -18,13 +21,13 @@
     </form>
     <nav class="tabs" aria-label="Report status">
         @foreach (['pending', 'reviewing', 'resolved', 'rejected'] as $tab)
-            <a href="{{ route('admin.reports', ['status' => $tab]) }}" @class(['is-on' => $status === $tab])>{{ ucfirst($tab) }}</a>
+            <a href="{{ route('admin.reports', array_merge(request()->except('page'), ['status' => $tab])) }}" @class(['is-on' => $status === $tab])>{{ ucfirst($tab) }}</a>
         @endforeach
     </nav>
     @forelse ($reports as $report)
         <form class="panel stack" method="POST" action="{{ route('admin.reports.update', $report) }}">
             @csrf
-            <p><strong>{{ $report->reason }}</strong> · {{ $report->reporter->name ?? 'Reporter' }} reported {{ $report->reported->name ?? 'user' }}
+            <p><strong>{{ $report->reason }}</strong> · {{ $report->created_at?->diffForHumans() }} · {{ $report->reporter->name ?? 'Reporter' }} reported {{ $report->reported->name ?? 'user' }}
                 @if ($hot->contains($report->reported_user_id)) <span class="badge bad">Needs review</span> @endif
                 @if ($report->match_id) <a href="{{ route('admin.matches.show', $report->match_id) }}">Match</a> @endif
             </p>

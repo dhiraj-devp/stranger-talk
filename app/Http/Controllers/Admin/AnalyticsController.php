@@ -18,13 +18,19 @@ class AnalyticsController extends Controller
         $section = in_array($section, self::SECTIONS, true) ? $section : 'overview';
         [$from, $to, $rows] = $this->rows($request, $rollup);
 
+        $cards = $this->cards($section, $rows);
+        $days = max(1, $from->diffInDays($to) + 1);
+        $previousRows = DailyMetric::query()->whereBetween('date', [$from->copy()->subDays($days)->toDateString(), $from->copy()->subDay()->toDateString()])->get();
+
         return view('admin.analytics', [
             'section' => $section,
             'sections' => self::SECTIONS,
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
-            'cards' => $this->cards($section, $rows),
+            'cards' => $cards,
+            'previous' => $this->cards($section, $previousRows),
             'table' => $this->table($section, $rows),
+            'series' => $rows->where('metric', 'visits')->where('dimension', '')->sortBy('date')->map(fn ($row) => ['label' => $row->date->toDateString(), 'value' => (int) $row->value])->values(),
         ]);
     }
 
@@ -52,7 +58,13 @@ class AnalyticsController extends Controller
             [$from, $to] = [$to, $from];
         }
         try {
-            $rollup->day(now());
+            if ($from->diffInDays($to) <= 14) {
+                for ($cursor = $from->copy(); $cursor->lte($to); $cursor->addDay()) {
+                    $rollup->day($cursor);
+                }
+            } else {
+                $rollup->day(now());
+            }
             $rows = DailyMetric::query()
                 ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
                 ->get();
