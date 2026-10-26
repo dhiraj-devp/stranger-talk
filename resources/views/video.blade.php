@@ -23,6 +23,8 @@
                 <select id="cam-device"></select>
                 <label for="mic-device">Microphone</label>
                 <select id="mic-device"></select>
+                <label id="spk-label" for="spk-device" hidden>Speaker</label>
+                <select id="spk-device" hidden></select>
                 <button id="report" type="button">Report</button>
                 <button id="block" type="button">Block</button>
                 <a href="{{ route('guidelines') }}">Community Guidelines</a>
@@ -35,15 +37,33 @@
         </details>
     </header>
 
-    <div class="stage">
-        <video id="remote" autoplay playsinline></video>
-        <p class="tag remote-tag">Stranger</p>
-        <div id="local-wrap" class="local-wrap">
-            <video id="local" autoplay playsinline muted></video>
-            <p class="tag">You</p>
-            <p id="local-state" class="local-state" aria-live="polite"></p>
+    <div class="workspace">
+        <div class="stage">
+            <video id="remote" autoplay playsinline></video>
+            <p class="tag remote-tag">Stranger</p>
+            <div id="local-wrap" class="local-wrap">
+                <video id="local" autoplay playsinline muted></video>
+                <p class="tag">You</p>
+                <p id="local-state" class="local-state" aria-live="polite"></p>
+            </div>
+            <p id="audio-tip" class="audio-tip" hidden>Tap to hear the other person</p>
         </div>
-        <p id="audio-tip" class="audio-tip" hidden>Tap to hear the other person</p>
+        <aside id="chat-panel" class="chat" hidden>
+            <div class="chat-head">
+                <h2>Chat</h2>
+                <button id="chat-report" type="button">Report</button>
+                <button id="chat-close" type="button" aria-label="Close chat">Close</button>
+            </div>
+            <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+            <p id="chat-empty" class="chat-empty">Messages appear here once you are matched. They stay with this match only.</p>
+            <p id="chat-error" class="chat-error" hidden></p>
+            <form id="chat-form" class="chat-form">
+                <label class="visually-hidden" for="chat-input">Message</label>
+                <textarea id="chat-input" maxlength="500" rows="2" placeholder="Waiting for a match" disabled></textarea>
+                <button id="chat-send" type="submit" disabled>Send</button>
+            </form>
+            <p class="chat-note">Saved with this match for {{ (int) config('platform.retention.match_events_days', 90) }} days. Not end-to-end encrypted.</p>
+        </aside>
     </div>
 
     <div class="dock">
@@ -55,6 +75,11 @@
             <button id="camera" type="button" title="Turn camera off" aria-label="Turn camera off" disabled>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11a2 2 0 0 1 2 2v1.2l3-1.8v9.2l-3-1.8V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg>
                 <span>Camera</span>
+            </button>
+            <button id="chat-toggle" type="button" title="Chat" aria-label="Chat" aria-expanded="false" aria-controls="chat-panel">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>
+                <span>Chat</span>
+                <b id="chat-unread" hidden>0</b>
             </button>
             <button id="next" type="button" class="next" title="Next stranger" aria-label="Next stranger">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h2v12H5V6Zm4.5 0 9 6-9 6V6Z"/></svg>
@@ -109,6 +134,7 @@
     <script src="{{ asset('js/room-state.js') }}?v={{ filemtime(public_path('js/room-state.js')) }}"></script>
     <script src="{{ route('webrtc.script') }}"></script>
     <script src="{{ asset('js/room-ui.js') }}?v={{ filemtime(public_path('js/room-ui.js')) }}"></script>
+    <script src="{{ asset('js/chat.js') }}?v={{ filemtime(public_path('js/chat.js')) }}"></script>
     <script src="{{ asset('js/pulse.js') }}?v={{ filemtime(public_path('js/pulse.js')) }}"></script>
 </body>
 </html>

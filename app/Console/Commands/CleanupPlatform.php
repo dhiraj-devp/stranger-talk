@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\AnalyticsEvent;
+use App\Models\MatchMessage;
 use App\Models\DailyMetric;
 use App\Models\MatchEvent;
 use App\Models\PageView;
@@ -42,9 +43,9 @@ class CleanupPlatform extends Command
             ->where('created_at', '<', now()->subDays((int) config('platform.retention.analytics_days', 180)))
             ->delete();
 
-        MatchEvent::query()
-            ->where('created_at', '<', now()->subDays((int) config('platform.retention.match_events_days', 90)))
-            ->delete();
+        $matchCutoff = now()->subDays((int) config('platform.retention.match_events_days', 90));
+        MatchEvent::query()->where('created_at', '<', $matchCutoff)->delete();
+        MatchMessage::query()->where('created_at', '<', $matchCutoff)->delete();
 
         $analyticsCutoff = now()->subDays((int) config('platform.retention.analytics_days', 180));
         PageView::query()->where('entered_at', '<', $analyticsCutoff)->delete();

@@ -63,7 +63,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
-        foreach (['login', 'register', 'password' => 'password_reset', 'matchmaking', 'next', 'reports', 'blocks', 'signal', 'google', 'api' => 'signal'] as $name => $key) {
+        foreach (['login', 'register', 'password' => 'password_reset', 'matchmaking', 'next', 'reports', 'blocks', 'signal', 'google', 'chat', 'api' => 'signal'] as $name => $key) {
             if (is_int($name)) {
                 $name = $key;
             }

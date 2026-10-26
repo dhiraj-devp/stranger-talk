@@ -16,6 +16,7 @@ return [
         'blocks' => (int) env('LIMIT_BLOCKS', 20),
         'signal' => (int) env('LIMIT_SIGNAL', 600),
         'google' => (int) env('LIMIT_GOOGLE', 10),
+        'chat' => (int) env('LIMIT_CHAT', 30),
     ],
 
     'retention' => [

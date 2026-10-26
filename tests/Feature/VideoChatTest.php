@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\MatchMessage;
 use App\Models\User;
 use App\Models\VideoMatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,6 +34,7 @@ class VideoChatTest extends TestCase
         $this->get('/')->assertOk()->assertSee('Start Video Chat');
         $this->get('/video')->assertRedirect('/login');
         $this->postJson('/match/find', ['token' => 'x'])->assertUnauthorized();
+        $this->postJson('/match/messages', ['token' => 'x', 'client_id' => 'x', 'body' => 'hi'])->assertUnauthorized();
     }
 
     public function test_two_users_match_and_exchange_signals_without_trusting_client_ids(): void
@@ -157,7 +159,95 @@ class VideoChatTest extends TestCase
             ->assertSee('id="quality"', false)
             ->assertSee('id="cam-device"', false)
             ->assertSee('id="remote"', false)
-            ->assertSee('room-state.js', false);
+            ->assertSee('room-state.js', false)
+            ->assertSee('id="chat-toggle"', false)
+            ->assertSee('id="chat-log"', false)
+            ->assertSee('chat.js', false);
+    }
+
+    public function test_match_chat_is_isolated_ordered_and_closed_when_the_match_ends(): void
+    {
+        $alone = User::factory()->create();
+        $this->actingAs($alone)->postJson('/match/find', ['token' => 'alone'])->assertJsonPath('status', 'waiting');
+        $this->actingAs($alone)->postJson('/match/messages', [
+            'token' => 'alone',
+            'client_id' => 'alone-1',
+            'body' => 'too early',
+        ])->assertStatus(409);
+        $this->actingAs($alone)->postJson('/match/end', ['token' => 'alone'])->assertOk();
+
+        [$a, $b] = $this->pair();
+        $this->actingAs($a)->postJson('/match/messages', [
+            'token' => 'token-a',
+            'client_id' => 'msg-1',
+            'body' => 'hello',
+        ])->assertCreated()->assertJsonPath('message.body', 'hello')->assertJsonPath('message.mine', true);
+
+        $this->actingAs($a)->postJson('/match/messages', [
+            'token' => 'token-a',
+            'client_id' => 'msg-1',
+            'body' => 'hello again',
+        ])->assertOk()->assertJsonPath('message.body', 'hello');
+        $this->assertSame(1, MatchMessage::query()->count());
+
+        $this->actingAs($a)->postJson('/match/messages', [
+            'token' => 'token-a',
+            'client_id' => 'msg-2',
+            'body' => 'second',
+        ])->assertCreated();
+
+        $this->actingAs($b)->getJson('/match/messages?token=token-b&after=0')
+            ->assertOk()
+            ->assertJsonPath('messages.0.body', 'hello')
+            ->assertJsonPath('messages.1.body', 'second')
+            ->assertJsonPath('messages.0.mine', false);
+
+        $stranger = User::factory()->create();
+        $this->actingAs($stranger)->getJson('/match/messages?token=token-a')->assertNotFound();
+        $this->actingAs($stranger)->postJson('/match/messages', [
+            'token' => 'token-b',
+            'client_id' => 'nope',
+            'body' => 'nope',
+        ])->assertNotFound();
+
+        $this->actingAs($a)->postJson('/match/messages', [
+            'token' => 'token-a',
+            'client_id' => 'long',
+            'body' => str_repeat('a', 501),
+        ])->assertStatus(422);
+
+        $this->actingAs($a)->postJson('/match/end', ['token' => 'token-a'])->assertOk();
+        $this->actingAs($b)->postJson('/match/messages', [
+            'token' => 'token-b',
+            'client_id' => 'after-end',
+            'body' => 'too late',
+        ])->assertStatus(409);
+        $this->actingAs($b)->getJson('/match/messages?token=token-b')->assertStatus(409);
+        $this->assertSame(2, MatchMessage::query()->count());
+
+        $this->actingAs($a)->postJson('/match/next', [
+            'token' => 'token-a',
+            'next_token' => 'token-a2',
+        ])->assertJsonPath('status', 'waiting');
+        $this->actingAs($a)->getJson('/match/messages?token=token-a2')->assertStatus(409);
+        $this->assertSame(0, MatchMessage::query()->whereHas('match', fn ($query) => $query->where('user_one_token', 'token-a2'))->count());
+    }
+
+    public function test_chat_rate_limit_is_enforced(): void
+    {
+        config(['platform.limits.chat' => 1]);
+        [$a] = $this->pair();
+
+        $this->actingAs($a)->postJson('/match/messages', [
+            'token' => 'token-a',
+            'client_id' => 'rate-1',
+            'body' => 'one',
+        ])->assertCreated();
+        $this->actingAs($a)->postJson('/match/messages', [
+            'token' => 'token-a',
+            'client_id' => 'rate-2',
+            'body' => 'two',
+        ])->assertStatus(429);
     }
 
     /**

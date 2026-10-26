@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\PanelController;
 use App\Http\Controllers\Admin\SeoController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HealthController;
@@ -76,6 +77,8 @@ Route::middleware(['auth', 'active', 'profile'])->group(function () {
     Route::post('/match/next', [MatchController::class, 'next'])->middleware('throttle:next')->name('match.next');
     Route::post('/match/end', [MatchController::class, 'end'])->name('match.end');
     Route::post('/match/leave', [MatchController::class, 'leave'])->name('match.leave');
+    Route::get('/match/messages', [ChatController::class, 'index'])->middleware('throttle:chat')->name('match.messages');
+    Route::post('/match/messages', [ChatController::class, 'store'])->middleware('throttle:chat')->name('match.messages.store');
     Route::post('/match/report', [SafetyController::class, 'report'])->middleware('throttle:reports')->name('match.report');
     Route::post('/match/block', [SafetyController::class, 'block'])->middleware('throttle:blocks')->name('match.block');
 });

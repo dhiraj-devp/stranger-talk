@@ -24,6 +24,7 @@
                 'blocks' => 'Blocks',
                 'signal' => 'Signaling',
                 'google' => 'Google sign-in',
+                'chat' => 'Text chat',
             ] as $key => $label)
                 @if (array_key_exists($key, $limits))
                     <label for="limit-{{ $key }}">{{ $label }}

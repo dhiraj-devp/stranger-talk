@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\ApiController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\SafetyController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/matches/signal', [MatchController::class, 'signal'])->middleware('throttle:signal');
         Route::post('/matches/next', [MatchController::class, 'next'])->middleware('throttle:next');
         Route::post('/matches/end', [MatchController::class, 'end']);
+        Route::get('/matches/messages', [ChatController::class, 'index'])->middleware('throttle:chat');
+        Route::post('/matches/messages', [ChatController::class, 'store'])->middleware('throttle:chat');
         Route::post('/reports', [SafetyController::class, 'report'])->middleware('throttle:reports');
         Route::post('/blocks', [SafetyController::class, 'block'])->middleware('throttle:blocks');
         Route::get('/blocks', [ApiController::class, 'blocks']);

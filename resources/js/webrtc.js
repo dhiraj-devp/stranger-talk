@@ -114,10 +114,17 @@ document.addEventListener('visibilitychange', () => {
 
 start();
 
+function announce(status) {
+    document.dispatchEvent(new CustomEvent('koko:match', {
+        detail: { token: pageToken, status: status },
+    }));
+}
+
 async function start() {
     if (busy) return;
     busy = true;
     epoch += 1;
+    announce('reset');
     endingUi = false;
     stopped = false;
     joined = false;
@@ -167,6 +174,7 @@ async function onNext() {
     clearTimeout(pollTimer);
     const previousToken = pageToken;
     pageToken = newToken();
+    announce('reset');
     closePeer();
     stopMedia();
     resetPeerState();
@@ -216,6 +224,7 @@ async function onEnd() {
         beacon(pageToken);
     }
 
+    announce('ended');
     window.location.href = '/home';
 }
 
@@ -257,10 +266,14 @@ async function pollOnce() {
 async function applyState(data) {
     if (!data || data.status === 'replaced') {
         stopped = true;
+        announce('replaced');
         return;
     }
 
-    if (data.status === 'idle') return;
+    if (data.status === 'idle') {
+        announce('idle');
+        return;
+    }
 
     if (data.status === 'ended' || data.status === 'failed' || data.status === 'expired') {
         onStrangerGone(data.status === 'failed' ? 'failed' : 'server:' + (data.end_reason || data.status));
@@ -269,8 +282,11 @@ async function applyState(data) {
 
     if (data.status === 'waiting') {
         setStatus('Finding someone...');
+        announce('waiting');
         return;
     }
+
+    announce(data.status);
 
     if (data.status === 'connected' || (pc && pc.connectionState === 'connected')) {
         setStatus('Connected');
@@ -431,6 +447,7 @@ function failCall(message, notify) {
     stopMedia();
     statusEl.textContent = message;
     statusEl.classList.add('is-error');
+    announce('ended');
     paintQuality('', false);
     if (window.RoomState) {
         const lower = String(message).toLowerCase();

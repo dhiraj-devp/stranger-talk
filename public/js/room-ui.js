@@ -98,6 +98,21 @@
     if (micSelect) micSelect.addEventListener('change', () => remember('koko.mic', micSelect.value));
     if (camSelect) camSelect.addEventListener('change', () => remember('koko.cam', camSelect.value));
 
+    const speaker = document.getElementById('spk-device');
+    const speakerLabel = document.getElementById('spk-label');
+    const remote = document.getElementById('remote');
+    if (speaker && remote && typeof remote.setSinkId === 'function') {
+        speaker.hidden = false;
+        if (speakerLabel) speakerLabel.hidden = false;
+        let savedSpeaker = '';
+        try { savedSpeaker = localStorage.getItem('koko.speaker') || ''; } catch (error) {}
+        fillDevices(speaker, 'audiooutput', savedSpeaker);
+        speaker.addEventListener('change', () => {
+            try { localStorage.setItem('koko.speaker', speaker.value); } catch (error) {}
+            remote.setSinkId(speaker.value).catch(() => {});
+        });
+    }
+
     const desktop = window.matchMedia('(min-width: 761px) and (pointer: fine)');
     document.addEventListener('keydown', (event) => {
         if (!desktop.matches) return;
