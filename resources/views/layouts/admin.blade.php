@@ -11,7 +11,8 @@
 <body>
     <div class="console">
         <aside class="side">
-            @include('partials.brand', ['href' => route('admin.dashboard')])
+            @include('partials.brand', ['href' => auth()->user()->staffRole() === 'analyst' ? route('admin.analytics') : route('admin.dashboard')])
+            @if (auth()->user()->staffRole() === 'admin')
             <p class="side-label">Site</p>
             <nav aria-label="Site">
                 <a href="{{ route('admin.seo') }}" @class(['is-on' => request()->routeIs('admin.seo')])>SEO</a>
@@ -22,16 +23,23 @@
                 <a href="{{ route('admin.redirects') }}" @class(['is-on' => request()->routeIs('admin.redirects')])>Redirects</a>
                 <a href="{{ route('admin.navigation') }}" @class(['is-on' => request()->routeIs('admin.navigation')])>Navigation</a>
             </nav>
+            @endif
             <p class="side-label">Operations</p>
             <nav aria-label="Admin">
-                <a href="{{ route('admin.dashboard') }}" @class(['is-on' => request()->routeIs('admin.dashboard')])>Overview</a>
-                <a href="{{ route('admin.live') }}" @class(['is-on' => request()->routeIs('admin.live')])>Live</a>
-                <a href="{{ route('admin.users') }}" @class(['is-on' => request()->routeIs('admin.users*')])>Users</a>
-                <a href="{{ route('admin.reports') }}" @class(['is-on' => request()->routeIs('admin.reports*')])>Reports @if ($pendingReports)<b>{{ $pendingReports }}</b>@endif</a>
-                <a href="{{ route('admin.bans') }}" @class(['is-on' => request()->routeIs('admin.bans')])>Bans</a>
-                <a href="{{ route('admin.matches') }}" @class(['is-on' => request()->routeIs('admin.matches')])>Matches</a>
-                <a href="{{ route('admin.audit') }}" @class(['is-on' => request()->routeIs('admin.audit')])>Audit</a>
-                <a href="{{ route('admin.health') }}" @class(['is-on' => request()->routeIs('admin.health')])>System</a>
+                @if (auth()->user()->staffRole() !== 'analyst')
+                    <a href="{{ route('admin.dashboard') }}" @class(['is-on' => request()->routeIs('admin.dashboard')])>Overview</a>
+                    <a href="{{ route('admin.live') }}" @class(['is-on' => request()->routeIs('admin.live')])>Live</a>
+                    <a href="{{ route('admin.users') }}" @class(['is-on' => request()->routeIs('admin.users*')])>Users</a>
+                    <a href="{{ route('admin.reports') }}" @class(['is-on' => request()->routeIs('admin.reports*')])>Reports @if ($pendingReports)<b>{{ $pendingReports }}</b>@endif</a>
+                    <a href="{{ route('admin.bans') }}" @class(['is-on' => request()->routeIs('admin.bans')])>Bans</a>
+                    <a href="{{ route('admin.matches') }}" @class(['is-on' => request()->routeIs('admin.matches*')])>Matches</a>
+                @endif
+                <a href="{{ route('admin.analytics') }}" @class(['is-on' => request()->routeIs('admin.analytics')])>Analytics</a>
+                @if (auth()->user()->staffRole() === 'admin')
+                    <a href="{{ route('admin.settings') }}" @class(['is-on' => request()->routeIs('admin.settings')])>Settings</a>
+                    <a href="{{ route('admin.audit') }}" @class(['is-on' => request()->routeIs('admin.audit')])>Audit</a>
+                    <a href="{{ route('admin.health') }}" @class(['is-on' => request()->routeIs('admin.health')])>System</a>
+                @endif
             </nav>
         </aside>
         <div class="main">

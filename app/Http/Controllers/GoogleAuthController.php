@@ -23,6 +23,15 @@ class GoogleAuthController extends Controller
         return Socialite::driver('google')->scopes(['openid', 'profile', 'email'])->redirect();
     }
 
+    public function stepUp(): RedirectResponse
+    {
+        if (! config('services.google.client_id') || ! config('services.google.client_secret') || ! config('services.google.redirect')) {
+            return back()->withErrors(['google' => 'Google sign-in is not configured yet.']);
+        }
+
+        return Socialite::driver('google')->scopes(['openid', 'profile', 'email'])->redirect();
+    }
+
     public function callback(GoogleAccountService $accounts): RedirectResponse
     {
         try {
@@ -41,7 +50,11 @@ class GoogleAuthController extends Controller
         Auth::login($user, true);
         request()->session()->regenerate();
         $user->forceFill(['status' => 'active', 'last_seen_at' => now()])->save();
+        request()->session()->put('google_authenticated_at', now()->getTimestamp());
         app(AnalyticsRecorder::class)->track($user, 'login');
+        if ($user->wasRecentlyCreated) {
+            app(AnalyticsRecorder::class)->track($user, 'signup_completed');
+        }
 
         if (! $user->profileComplete()) {
             return redirect()->route('profile.setup');

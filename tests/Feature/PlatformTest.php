@@ -231,11 +231,52 @@ class PlatformTest extends TestCase
         $this->assertSame('resolved', $report->fresh()->status);
         $this->assertTrue(AuditLog::query()->where('action', 'resolve_report')->exists());
 
+        config(['features.preference_matching' => false]);
+        $this->actingAs($admin)->get('/admin/analytics')->assertOk()->assertSee('Visits');
+        $this->actingAs($admin)->get('/admin/analytics/funnel/export')->assertOk();
+
         $this->actingAs($admin)->post('/admin/users/'.$b->id.'/ban', [
             'reason' => 'spam',
             'permanent' => '1',
         ])->assertRedirect();
         $this->assertTrue($b->fresh()->isBanned());
+    }
+
+    public function test_preference_matching_stays_off_until_enabled(): void
+    {
+        config(['features.preference_matching' => false]);
+        $male = User::factory()->create(['gender' => 'male', 'country_code' => 'US']);
+        $female = User::factory()->create(['gender' => 'female', 'country_code' => 'JP']);
+        MatchPreference::query()->create([
+            'user_id' => $male->id,
+            'gender_preference' => 'male',
+            'country_preference' => 'US',
+        ]);
+        $this->actingAs($male)->postJson('/match/find', ['token' => 'pref-off-a'])->assertJsonPath('status', 'waiting');
+        $this->actingAs($female)->postJson('/match/find', ['token' => 'pref-off-b'])->assertJsonPath('status', 'connecting');
+
+        VideoMatch::query()->update(['status' => 'ended', 'end_reason' => 'end']);
+        config(['features.preference_matching' => true]);
+        $this->actingAs($male)->postJson('/match/find', ['token' => 'pref-on-a'])->assertJsonPath('status', 'waiting');
+        $this->actingAs($female)->postJson('/match/find', ['token' => 'pref-on-b'])->assertJsonPath('status', 'waiting');
+        $this->assertSame(2, VideoMatch::query()->where('status', 'waiting')->count());
+
+        VideoMatch::query()->update(['status' => 'ended', 'end_reason' => 'end']);
+        $open = User::factory()->create(['gender' => 'female', 'country_code' => 'FR']);
+        $other = User::factory()->create(['gender' => 'male', 'country_code' => 'DE']);
+        MatchPreference::query()->create(['user_id' => $open->id, 'gender_preference' => 'anyone', 'country_preference' => null]);
+        MatchPreference::query()->create(['user_id' => $other->id, 'gender_preference' => 'anyone', 'country_preference' => null]);
+        $this->actingAs($open)->postJson('/match/find', ['token' => 'pref-any-a'])->assertJsonPath('status', 'waiting');
+        $this->actingAs($other)->postJson('/match/find', ['token' => 'pref-any-b'])->assertJsonPath('status', 'connecting');
+
+        VideoMatch::query()->update(['status' => 'ended', 'end_reason' => 'end']);
+        $blocked = User::factory()->create();
+        Block::query()->create(['blocker_id' => $open->id, 'blocked_id' => $blocked->id]);
+        $this->actingAs($open)->postJson('/match/find', ['token' => 'pref-block-a'])->assertJsonPath('status', 'waiting');
+        $this->actingAs($blocked)->postJson('/match/find', ['token' => 'pref-block-b'])->assertJsonPath('status', 'waiting');
+        $this->assertSame(2, VideoMatch::query()->where('status', 'waiting')->count());
+        $open->forceFill(['status' => User::BANNED, 'banned_until' => null])->save();
+        $this->actingAs($open)->postJson('/match/find', ['token' => 'pref-ban'])->assertForbidden();
     }
 
     public function test_google_start_is_rate_limited(): void

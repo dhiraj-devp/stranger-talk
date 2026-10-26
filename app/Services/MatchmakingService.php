@@ -18,6 +18,29 @@ class MatchmakingService
             return false;
         }
 
-        return ! in_array($partner->id, $this->safety->blockedIds($seeker->id), true);
+        if (in_array($partner->id, $this->safety->blockedIds($seeker->id), true)) {
+            return false;
+        }
+
+        if (! config('features.preference_matching')) {
+            return true;
+        }
+
+        return $this->accepts($seeker, $partner) && $this->accepts($partner, $seeker);
+    }
+
+    private function accepts(User $chooser, User $candidate): bool
+    {
+        $preference = $chooser->matchPreference()->first();
+        if (! $preference) {
+            return true;
+        }
+
+        $gender = $preference->gender_preference ?: 'anyone';
+        if ($gender !== 'anyone' && $gender !== $candidate->gender) {
+            return false;
+        }
+
+        return ! $preference->country_preference || $preference->country_preference === $candidate->country_code;
     }
 }

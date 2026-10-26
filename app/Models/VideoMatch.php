@@ -34,6 +34,7 @@ class VideoMatch extends Model
         'user_two_seen_at',
         'user_one_token',
         'user_two_token',
+        'ended_at',
     ];
 
     protected function casts(): array
@@ -42,6 +43,7 @@ class VideoMatch extends Model
             'signal' => 'array',
             'user_one_seen_at' => 'datetime',
             'user_two_seen_at' => 'datetime',
+            'ended_at' => 'datetime',
         ];
     }
 

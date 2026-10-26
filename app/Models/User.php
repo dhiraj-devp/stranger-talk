@@ -72,6 +72,15 @@ class User extends Authenticatable
         return (bool) config('features.'.$feature, false);
     }
 
+    public function staffRole(): string
+    {
+        if ($this->is_admin || $this->role === 'admin') {
+            return 'admin';
+        }
+
+        return in_array($this->role, ['analyst', 'moderator'], true) ? $this->role : 'member';
+    }
+
     public function matchPreference(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(MatchPreference::class);

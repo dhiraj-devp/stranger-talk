@@ -118,11 +118,17 @@ class SeoBuilder
     public static function faqs(string $site): array
     {
         return [
-            ['q' => 'Do you record video calls?', 'a' => 'No. Video and audio are not stored by '.$site.'.'],
-            ['q' => 'How does matching work?', 'a' => 'You are paired at random with one other person who is also looking.'],
+            ['q' => 'What is '.$site.'?', 'a' => $site.' is a random one-to-one video chat. You are paired with one other person for a live conversation.'],
+            ['q' => 'How do I start a conversation?', 'a' => 'Sign in with Google, confirm your profile, then start a search.'],
+            ['q' => 'How does matching work?', 'a' => config('features.preference_matching')
+                ? 'You are paired with one other person who is also looking and who fits the gender and country preferences you both saved.'
+                : 'You are paired at random with one other person who is also looking. Gender and country are not used to filter matches.'],
             ['q' => 'Can I skip someone?', 'a' => 'Yes. Next ends the current call and looks for someone else.'],
-            ['q' => 'What happens if someone behaves badly?', 'a' => 'Leave the call, then report or block them from the menu.'],
-            ['q' => 'Do I need an account?', 'a' => 'Yes. Sign in with Google, then confirm a short profile the first time.'],
+            ['q' => 'Does '.$site.' record my calls?', 'a' => 'No. Video and audio are not stored by '.$site.'. Media goes directly between browsers when the network allows it. If a relay is configured and a direct connection fails, that relay may carry the call only while it lasts. '.$site.' still does not keep a recording.'],
+            ['q' => 'What should I do if someone behaves inappropriately?', 'a' => 'Leave the call, then report or block them. Moderators can review the report and account history. They cannot watch a recording, because none is kept.'],
+            ['q' => 'Are gender and country filters available?', 'a' => config('features.preference_matching')
+                ? 'Yes. Saved gender and country preferences are used when pairing. Anyone and any country still match freely.'
+                : 'You can save those preferences, but they do not change who you are paired with yet.'],
         ];
     }
 

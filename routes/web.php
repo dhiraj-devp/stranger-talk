@@ -17,11 +17,18 @@ use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\VideoController;
 use Illuminate\Support\Facades\Route;
 
+if (app()->runningUnitTests()) {
+    Route::get('/__exception', function () {
+        throw new RuntimeException('database password hidden');
+    });
+}
+
 Route::get('/', [PageController::class, 'landing'])->name('landing');
 Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [PageController::class, 'terms'])->name('terms');
 Route::get('/guidelines', [PageController::class, 'guidelines'])->name('guidelines');
 Route::get('/health', HealthController::class)->name('health');
+Route::post('/analytics/pulse', [\App\Http\Controllers\AnalyticsController::class, 'pulse'])->name('analytics.pulse');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/robots.txt', RobotsController::class)->name('robots');
 Route::get('/site.webmanifest', ManifestController::class)->name('manifest');
@@ -43,6 +50,7 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'active'])->group(function () {
+    Route::get('/auth/google/step-up', [GoogleAuthController::class, 'stepUp'])->name('auth.google.stepup');
     Route::get('/profile/setup', [ProfileController::class, 'setup'])->name('profile.setup');
     Route::post('/profile/setup', [ProfileController::class, 'storeSetup'])->name('profile.setup.store');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -72,19 +80,31 @@ Route::middleware(['auth', 'active', 'profile'])->group(function () {
     Route::post('/match/block', [SafetyController::class, 'block'])->middleware('throttle:blocks')->name('match.block');
 });
 
-Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/', [PanelController::class, 'dashboard'])->name('dashboard');
-    Route::get('/live', [PanelController::class, 'live'])->name('live');
-    Route::get('/users', [PanelController::class, 'users'])->name('users');
-    Route::get('/users/{user}', [PanelController::class, 'showUser'])->name('users.show');
-    Route::post('/users/{user}/ban', [PanelController::class, 'ban'])->name('users.ban');
-    Route::post('/users/{user}/unban', [PanelController::class, 'unban'])->name('users.unban');
+Route::middleware(['auth', 'active'])->prefix('admin')->name('admin.')->group(function () {
+    Route::middleware('staff:moderator')->group(function () {
+        Route::get('/', [PanelController::class, 'dashboard'])->name('dashboard');
+        Route::get('/live', [PanelController::class, 'live'])->name('live');
+        Route::get('/users', [PanelController::class, 'users'])->name('users');
+        Route::get('/users/{user}', [PanelController::class, 'showUser'])->name('users.show');
+        Route::post('/users/{user}/ban', [PanelController::class, 'ban'])->name('users.ban');
+        Route::post('/users/{user}/unban', [PanelController::class, 'unban'])->name('users.unban');
+        Route::get('/bans', [PanelController::class, 'bans'])->name('bans');
+        Route::post('/bans/{ban}', [PanelController::class, 'reviseBan'])->name('bans.revise');
+        Route::get('/matches', [PanelController::class, 'matches'])->name('matches');
+        Route::get('/matches/{match}', [PanelController::class, 'showMatch'])->name('matches.show');
+        Route::get('/reports', [PanelController::class, 'reports'])->name('reports');
+        Route::post('/reports/{report}', [PanelController::class, 'updateReport'])->name('reports.update');
+    });
+    Route::middleware('staff:analyst,moderator')->group(function () {
+        Route::get('/analytics/{section?}', [\App\Http\Controllers\Admin\AnalyticsController::class, 'show'])->name('analytics');
+        Route::get('/analytics/{section}/export', [\App\Http\Controllers\Admin\AnalyticsController::class, 'export'])->name('analytics.export');
+    });
+    Route::middleware('admin')->group(function () {
+    Route::post('/users/{user}', [PanelController::class, 'updateUser'])->name('users.update');
     Route::delete('/users/{user}', [PanelController::class, 'destroy'])->name('users.destroy');
-    Route::get('/bans', [PanelController::class, 'bans'])->name('bans');
-    Route::get('/matches', [PanelController::class, 'matches'])->name('matches');
+    Route::get('/settings', [PanelController::class, 'settings'])->name('settings');
+    Route::post('/settings', [PanelController::class, 'updateSettings'])->name('settings.update');
     Route::get('/audit', [PanelController::class, 'audit'])->name('audit');
-    Route::get('/reports', [PanelController::class, 'reports'])->name('reports');
-    Route::post('/reports/{report}', [PanelController::class, 'updateReport'])->name('reports.update');
     Route::get('/health', [PanelController::class, 'health'])->name('health');
     Route::get('/seo', [SeoController::class, 'overview'])->name('seo');
     Route::get('/seo/settings', [SeoController::class, 'settings'])->name('seo.edit');
@@ -107,6 +127,7 @@ Route::middleware(['auth', 'active', 'admin'])->prefix('admin')->name('admin.')-
     Route::get('/navigation', [SeoController::class, 'navigation'])->name('navigation');
     Route::post('/navigation', [SeoController::class, 'storeNavigation'])->name('navigation.store');
     Route::delete('/navigation/{item}', [SeoController::class, 'destroyNavigation'])->name('navigation.destroy');
+    });
 });
 
 Route::get('/{slug}', [ContentController::class, 'page'])->where('slug', '[a-z0-9\-]+')->name('content.page');

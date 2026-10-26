@@ -19,6 +19,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
     <link rel="canonical" href="{{ $canonical }}">
@@ -69,5 +70,6 @@
 </head>
 <body class="@yield('body-class', 'marketing')">
     @yield('content')
+    <script src="{{ asset('js/pulse.js') }}?v={{ filemtime(public_path('js/pulse.js')) }}"></script>
 </body>
 </html>

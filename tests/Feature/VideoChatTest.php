@@ -153,7 +153,11 @@ class VideoChatTest extends TestCase
         $this->actingAs($user)->get('/video')
             ->assertOk()
             ->assertSee('stun:stun.l.google.com:19302', false)
-            ->assertDontSee('turn-secret-value', false);
+            ->assertDontSee('turn-secret-value', false)
+            ->assertSee('id="quality"', false)
+            ->assertSee('id="cam-device"', false)
+            ->assertSee('id="remote"', false)
+            ->assertSee('room-state.js', false);
     }
 
     /**

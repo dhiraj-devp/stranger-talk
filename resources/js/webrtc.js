@@ -130,7 +130,8 @@ async function start() {
     cameraBtn.disabled = true;
     audioTip.hidden = true;
     searchingAgain = false;
-    setStatus('Finding someone...');
+    if (window.RoomState) window.RoomState.set('permissions');
+    setStatus('Allow camera and microphone');
 
     try {
         if (!supportsWebRtc()) {
@@ -141,6 +142,7 @@ async function start() {
         await ensureMedia();
         muteBtn.disabled = false;
         cameraBtn.disabled = false;
+        setStatus('Finding someone...');
         const data = await api('/match/find', {
             method: 'POST',
             body: JSON.stringify({ token: pageToken }),
@@ -344,6 +346,7 @@ async function ensurePeer(role) {
         if (pc.connectionState === 'connected') {
             clearTimeout(disconnectTimer);
             setStatus('Connected');
+            watchQuality();
             api('/match/signal', {
                 method: 'POST',
                 body: JSON.stringify({ token: pageToken, type: 'connected', payload: {} }),
@@ -358,6 +361,7 @@ async function ensurePeer(role) {
             if (!iceRestarted && typeof pc.restartIce === 'function') {
                 iceRestarted = true;
                 setStatus('Connection problem');
+                paintQuality('Reconnecting', true);
                 try { pc.restartIce(); } catch (error) {}
             }
             clearTimeout(disconnectTimer);
@@ -427,6 +431,17 @@ function failCall(message, notify) {
     stopMedia();
     statusEl.textContent = message;
     statusEl.classList.add('is-error');
+    paintQuality('', false);
+    if (window.RoomState) {
+        const lower = String(message).toLowerCase();
+        if (lower.indexOf('permission') !== -1 || lower.indexOf('camera') !== -1 || lower.indexOf('microphone') !== -1 || lower.indexOf('browser') !== -1) {
+            window.RoomState.set('permissions');
+        } else if (message === 'Stranger disconnected') {
+            window.RoomState.set('partner-left');
+        } else {
+            window.RoomState.set('ended');
+        }
+    }
     againBtn.hidden = false;
     nextBtn.disabled = true;
     muteBtn.disabled = true;
@@ -436,6 +451,7 @@ function failCall(message, notify) {
 }
 
 function closePeer() {
+    clearInterval(qualityTimer);
     if (!pc) return;
     const connection = pc;
     pc = null;
@@ -454,10 +470,27 @@ function stopMedia() {
     remoteVideo.srcObject = null;
 }
 
+function mediaConstraints() {
+    let mic = '';
+    let cam = '';
+    try {
+        mic = localStorage.getItem('koko.mic') || '';
+        cam = localStorage.getItem('koko.cam') || '';
+    } catch (error) {}
+    return {
+        audio: mic ? { deviceId: { exact: mic } } : true,
+        video: cam ? { deviceId: { exact: cam } } : true,
+    };
+}
+
 async function ensureMedia() {
     if (localStream) return;
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints());
+        } catch (error) {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        }
     } catch (error) {
         const videoOk = await probeMedia({ video: true });
         const audioOk = await probeMedia({ audio: true });
@@ -516,7 +549,72 @@ function label(button, text, pressed) {
 function setStatus(text) {
     statusEl.classList.remove('is-error');
     statusEl.textContent = text;
+    if (!window.RoomState) return;
+    const map = {
+        'Allow camera and microphone': 'permissions',
+        'Finding someone...': 'searching',
+        'Connecting...': 'connecting',
+        'Connected': 'live',
+        'Connection problem': 'reconnecting',
+    };
+    if (map[text]) window.RoomState.set(map[text]);
 }
+
+let qualityTimer = null;
+
+function paintQuality(text, bad) {
+    const el = document.getElementById('quality');
+    if (!el) return;
+    el.hidden = text === '';
+    el.textContent = text;
+    el.classList.toggle('is-bad', !!bad);
+}
+
+function watchQuality() {
+    clearInterval(qualityTimer);
+    qualityTimer = setInterval(sampleQuality, 3000);
+    sampleQuality();
+}
+
+async function sampleQuality() {
+    if (!pc || pc.connectionState === 'disconnected') {
+        paintQuality('Reconnecting', true);
+        return;
+    }
+    if (pc.connectionState !== 'connected') return;
+    try {
+        const stats = await pc.getStats();
+        let rtt = null;
+        let lost = 0;
+        let received = 0;
+        stats.forEach((report) => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated && typeof report.currentRoundTripTime === 'number') {
+                rtt = report.currentRoundTripTime;
+            }
+            if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                lost += report.packetsLost || 0;
+                received += report.packetsReceived || 0;
+            }
+        });
+        const loss = received > 0 ? lost / (lost + received) : 0;
+        if ((rtt !== null && rtt > 0.4) || loss > 0.08) paintQuality('Unstable', true);
+        else paintQuality('Good', false);
+    } catch (error) {}
+}
+
+window.__reacquireMedia = async function () {
+    stopMedia();
+    await ensureMedia();
+    muteBtn.disabled = false;
+    cameraBtn.disabled = false;
+    if (!pc || !localStream) return;
+    const senders = pc.getSenders();
+    localStream.getTracks().forEach((track) => {
+        const sender = senders.find((item) => item.track && item.track.kind === track.kind);
+        if (sender) sender.replaceTrack(track);
+        else pc.addTrack(track, localStream);
+    });
+};
 
 async function probeMedia(constraints) {
     try {

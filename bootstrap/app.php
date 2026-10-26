@@ -3,8 +3,10 @@
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureNotBanned;
 use App\Http\Middleware\EnsureProfileComplete;
+use App\Http\Middleware\EnsureStaff;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SeoRedirects;
+use App\Http\Middleware\TrackVisit;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,21 +28,26 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn () => route('home'));
         $middleware->alias([
             'admin' => EnsureAdmin::class,
+            'staff' => EnsureStaff::class,
             'active' => EnsureNotBanned::class,
             'profile' => EnsureProfileComplete::class,
         ]);
+        $middleware->append(TrackVisit::class);
         $middleware->append(SeoRedirects::class);
         $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $e, Request $request) {
-            if (! $request->expectsJson() || config('app.debug')) {
-                return null;
-            }
             if ($e instanceof ValidationException || $e instanceof AuthenticationException || $e instanceof HttpExceptionInterface) {
                 return null;
             }
+            if (config('app.debug') && ! app()->environment('production')) {
+                return null;
+            }
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Something went wrong. Please try again.'], 500);
+            }
 
-            return response()->json(['message' => 'Something went wrong. Please try again.'], 500);
+            return response()->view('errors.500', [], 500);
         });
     })->create();

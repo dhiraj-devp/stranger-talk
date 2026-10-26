@@ -76,6 +76,9 @@ class PanelController extends Controller
 
     public function ban(Request $request, User $user, SafetyService $safety): RedirectResponse
     {
+        if ($redirect = $this->freshGoogle($request)) {
+            return $redirect;
+        }
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -96,8 +99,36 @@ class PanelController extends Controller
         return back()->with('status', 'User unbanned.');
     }
 
+    public function updateUser(Request $request, User $user): RedirectResponse
+    {
+        if ($redirect = $this->freshGoogle($request)) {
+            return $redirect;
+        }
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'gender' => ['nullable', 'in:male,female,other,undisclosed'],
+            'country_code' => ['nullable', 'string', 'size:2'],
+            'role' => ['required', 'in:member,analyst,moderator,admin'],
+            'status' => ['required', 'in:active,offline,searching,in_call,banned'],
+        ]);
+        $user->forceFill([
+            'name' => $data['name'],
+            'gender' => $data['gender'] ?: null,
+            'country_code' => $data['country_code'] ? strtoupper($data['country_code']) : null,
+            'role' => $data['role'],
+            'status' => $data['status'],
+            'is_admin' => $data['role'] === 'admin',
+        ])->save();
+        \App\Models\AuditLog::write($request->user(), 'update_user', $user, ['role' => $data['role']], $request->ip());
+
+        return back()->with('status', 'User updated.');
+    }
+
     public function destroy(Request $request, User $user): RedirectResponse
     {
+        if ($redirect = $this->freshGoogle($request)) {
+            return $redirect;
+        }
         $data = $request->validate(['confirm_email' => ['required', 'email']]);
         if ($user->id === $request->user()->id || strcasecmp($data['confirm_email'], $user->email) !== 0) {
             return back()->withErrors(['confirm_email' => 'Type the user email to confirm deletion.']);
@@ -116,9 +147,35 @@ class PanelController extends Controller
         if (! in_array($status, [Report::PENDING, Report::REVIEWING, Report::RESOLVED, Report::REJECTED], true)) {
             $status = Report::PENDING;
         }
-        $reports = Report::query()->with(['reporter', 'reported'])->where('status', $status)->latest()->paginate(20);
+        $reason = (string) $request->query('reason', '');
+        $hot = Report::query()
+            ->select('reported_user_id')
+            ->where('status', Report::PENDING)
+            ->where('created_at', '>=', now()->subDay())
+            ->groupBy('reported_user_id')
+            ->havingRaw('count(*) >= 3')
+            ->pluck('reported_user_id');
 
-        return view('admin.reports', ['reports' => $reports, 'status' => $status]);
+        $reports = Report::query()->with(['reporter', 'reported', 'moderator'])
+            ->where('status', $status)
+            ->when($reason !== '', fn ($query) => $query->where('reason', $reason))
+            ->when($request->filled('from'), fn ($query) => $query->where('created_at', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($query) => $query->where('created_at', '<=', $request->date('to')->endOfDay()))
+            ->when($status === Report::PENDING && $hot->isNotEmpty(), function ($query) use ($hot) {
+                $ids = $hot->implode(',');
+                $query->orderByRaw('case when reported_user_id in ('.$ids.') then 0 else 1 end');
+            })
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('admin.reports', [
+            'reports' => $reports,
+            'status' => $status,
+            'reason' => $reason,
+            'hot' => $hot,
+            'staff' => User::query()->where('is_admin', true)->orWhereIn('role', ['admin', 'moderator'])->orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
     public function updateReport(Request $request, Report $report): RedirectResponse
@@ -127,11 +184,12 @@ class PanelController extends Controller
         $data = $request->validate([
             'status' => ['required', 'in:pending,reviewing,resolved,rejected'],
             'moderator_notes' => ['nullable', 'string', 'max:1000'],
+            'moderator_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
         $report->fill([
             'status' => $data['status'],
             'moderator_notes' => $data['moderator_notes'] ?? $report->moderator_notes,
-            'moderator_id' => $request->user()->id,
+            'moderator_id' => $data['moderator_id'] ?? $request->user()->id,
         ])->save();
 
         $action = $data['status'] === Report::RESOLVED ? 'resolve_report' : ($data['status'] === Report::REJECTED ? 'reject_report' : 'review_report');
@@ -168,6 +226,85 @@ class PanelController extends Controller
     public function health(): View
     {
         return view('admin.health', ['health' => app(\App\Http\Controllers\HealthController::class)()->getData(true)]);
+    }
+
+    public function showMatch(VideoMatch $match): View
+    {
+        $match->load(['userOne:id,name,email', 'userTwo:id,name,email']);
+        $seconds = ($match->created_at && ($match->ended_at || $match->updated_at))
+            ? $match->created_at->diffInSeconds($match->ended_at ?: $match->updated_at)
+            : 0;
+
+        return view('admin.match', [
+            'match' => $match,
+            'seconds' => (int) $seconds,
+            'events' => \App\Models\MatchEvent::query()->where('match_id', $match->id)->orderBy('id')->get(),
+        ]);
+    }
+
+    public function reviseBan(Request $request, \App\Models\Ban $ban, SafetyService $safety): RedirectResponse
+    {
+        if ($redirect = $this->freshGoogle($request)) {
+            return $redirect;
+        }
+        $data = $request->validate([
+            'hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
+            'lift' => ['nullable', 'boolean'],
+        ]);
+        if ($request->boolean('lift')) {
+            $safety->unban($ban->user, $request->user(), $request->ip());
+        } else {
+            $safety->reviseBan($ban, $request->user(), now()->addHours((int) ($data['hours'] ?? 24)), $request->ip());
+        }
+
+        return back()->with('status', 'Ban updated.');
+    }
+
+    public function settings(): View
+    {
+        return view('admin.settings', [
+            'settings' => \App\Models\PlatformSetting::current(),
+            'limits' => config('platform.limits'),
+        ]);
+    }
+
+    public function updateSettings(Request $request): RedirectResponse
+    {
+        if ($redirect = $this->freshGoogle($request)) {
+            return $redirect;
+        }
+        $limits = [];
+        foreach (array_keys(config('platform.limits')) as $key) {
+            $limits[$key] = max(1, (int) $request->input('limits.'.$key, config('platform.limits.'.$key)));
+        }
+        $settings = \App\Models\PlatformSetting::current();
+        $settings->fill([
+            'preference_matching' => $request->boolean('preference_matching'),
+            'limits' => $limits,
+        ])->save();
+        config([
+            'features.preference_matching' => $settings->preference_matching,
+            'platform.limits' => $limits,
+        ]);
+        \App\Models\AuditLog::write($request->user(), 'update_settings', $settings, [
+            'preference_matching' => $settings->preference_matching,
+        ], $request->ip());
+
+        return back()->with('status', 'Settings saved.');
+    }
+
+    private function freshGoogle(Request $request): ?RedirectResponse
+    {
+        if (! app()->environment('production') && ! config('services.google.client_id')) {
+            return null;
+        }
+        $at = (int) $request->session()->get('google_authenticated_at', 0);
+        if ($at >= now()->subHours(12)->getTimestamp()) {
+            return null;
+        }
+        $request->session()->put('url.intended', url()->previous());
+
+        return redirect()->route('auth.google.stepup');
     }
 
     private function stats(): array

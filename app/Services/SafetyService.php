@@ -92,4 +92,19 @@ class SafetyService
 
         AuditLog::write($admin, 'unban', $user, [], $ip);
     }
+
+    public function reviseBan(Ban $ban, User $admin, ?Carbon $until, ?string $ip): void
+    {
+        $ban->forceFill([
+            'banned_until' => $until,
+            'permanent' => $until === null,
+        ])->save();
+        $ban->user?->forceFill([
+            'status' => User::BANNED,
+            'banned_until' => $until,
+        ])->save();
+        AuditLog::write($admin, 'revise_ban', $ban->user, [
+            'until' => $until?->toIso8601String(),
+        ], $ip);
+    }
 }

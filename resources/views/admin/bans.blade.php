@@ -12,7 +12,17 @@
                     <td>{{ $ban->reason }}</td>
                     <td>{{ $ban->permanent ? 'Permanent' : ($ban->banned_until?->toDayDateTimeString() ?: '—') }}</td>
                     <td>{{ $ban->admin->name ?? '—' }}</td>
-                    <td><span @class(['badge', 'ok' => $ban->lifted_at, 'bad' => ! $ban->lifted_at])>{{ $ban->lifted_at ? 'Lifted' : 'Active' }}</span></td>
+                    <td>
+                        <span @class(['badge', 'ok' => $ban->lifted_at, 'bad' => ! $ban->lifted_at])>{{ $ban->lifted_at ? 'Lifted' : 'Active' }}</span>
+                        @if (! $ban->lifted_at)
+                            <form method="POST" action="{{ route('admin.bans.revise', $ban) }}">
+                                @csrf
+                                <input name="hours" type="number" min="1" value="24" aria-label="Hours remaining">
+                                <button type="submit">Update time</button>
+                                <button type="submit" name="lift" value="1" class="secondary">Lift</button>
+                            </form>
+                        @endif
+                    </td>
                 </tr>
             @empty
                 <tr><td class="empty">No bans recorded.</td></tr>

@@ -21,6 +21,25 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        try {
+            $settings = \App\Models\PlatformSetting::query()->first();
+            if ($settings) {
+                config(['features.preference_matching' => (bool) $settings->preference_matching]);
+                if (is_array($settings->limits)) {
+                    config(['platform.limits' => array_merge(config('platform.limits'), $settings->limits)]);
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        if ($this->app->environment('production')) {
+            config(['app.debug' => false]);
+        }
+        if (! config('app.debug')) {
+            ini_set('display_errors', '0');
+            ini_set('display_startup_errors', '0');
+        }
+
         Password::defaults(fn () => Password::min(8)->letters()->numbers());
 
         View::composer('*', function ($view) {

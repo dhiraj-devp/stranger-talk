@@ -31,6 +31,10 @@ class MatchController extends Controller
         $token = $this->token($request);
         $match = $this->enqueue($request->user(), $token);
         app(AnalyticsRecorder::class)->track($request->user(), 'find_stranger');
+        app(AnalyticsRecorder::class)->track($request->user(), 'search_started');
+        if ($match->status === VideoMatch::WAITING) {
+            app(AnalyticsRecorder::class)->track($request->user(), 'search_wait');
+        }
 
         return $this->json($this->present($match, $request->user(), 0));
     }
@@ -285,6 +289,7 @@ class MatchController extends Controller
 
             $locked->status = VideoMatch::ENDED;
             $locked->end_reason = $reason;
+            $locked->ended_at = now();
             $locked->save();
             $type = match ($reason) {
                 'next' => MatchEvent::NEXT,
@@ -293,6 +298,8 @@ class MatchController extends Controller
             };
             MatchEvent::write($locked->id, $user->id, $type);
             app(AnalyticsRecorder::class)->track($user, $reason === 'next' ? 'next' : 'call_ended');
+            $seconds = $locked->created_at ? (int) $locked->created_at->diffInSeconds($locked->ended_at) : 0;
+            app(AnalyticsRecorder::class)->track($user, 'call_duration', ['seconds' => $seconds]);
         });
     }
 
@@ -473,6 +480,7 @@ class MatchController extends Controller
         } elseif ($type === 'connected') {
             MatchEvent::write($match->id, $user->id, MatchEvent::CONNECTED);
             app(AnalyticsRecorder::class)->track($user, 'connection_connected');
+            app(AnalyticsRecorder::class)->track($user, 'call_connected');
         } elseif ($type === 'failed') {
             MatchEvent::write($match->id, $user->id, MatchEvent::FAILED);
             app(AnalyticsRecorder::class)->track($user, 'connection_failed');

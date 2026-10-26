@@ -12,7 +12,7 @@ class EnsureAdmin
     {
         $user = $request->user();
 
-        if (! $user || ! $user->is_admin) {
+        if (! $user || $user->staffRole() !== 'admin') {
             abort(403, 'You do not have access to the admin panel.');
         }
 

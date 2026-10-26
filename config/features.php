@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'preference_matching' => false,
     'gender_filter' => false,
     'country_filter' => false,
     'language_filter' => false,

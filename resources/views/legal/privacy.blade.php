@@ -10,7 +10,7 @@
         <p>Video and audio are not stored by this application. Media is sent with WebRTC, directly between browsers when the network allows it. If a direct connection is not possible and a TURN server is configured, that server may relay the media only for the length of the call. This site does not record those streams.</p>
         <p>We store your account details (name, email, and a password hash or Google account id), match records, safety reports, blocks, bans, and limited event logs such as “call started” or “call ended.” We do not store the contents of a call.</p>
         <p>You can block someone so you are not paired again, and you can report a call. Moderators may review the report text and account history. They cannot watch a recording, because none is kept.</p>
-        <p>Analytics counts events such as registrations and completed connections. Old analytics and match-event rows are deleted on the schedule configured for the server. Reports, bans, and audit logs are kept for moderation.</p>
+        <p>Analytics counts events such as registrations and completed connections. It also stores the page path, how long that page stayed visible, a device class (mobile, tablet, or desktop), the referring site host, and a country code when the network provides one. A random cookie ties those page views to one visit. It is not used to fingerprint a browser. Those rows are deleted after {{ (int) config('platform.retention.analytics_days', 180) }} days. Reports, bans, and audit logs are kept for moderation.</p>
         <p>This page describes how the software behaves. It is not legal advice.</p>
         </article>
     </main>

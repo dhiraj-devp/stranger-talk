@@ -12,10 +12,17 @@
 <body class="video-body">
     <header class="room-bar">
         @include('partials.brand', ['href' => route('home')])
-        <p id="status" role="status">Finding someone...</p>
+        <div class="room-status">
+            <p id="status" role="status">Allow camera and microphone</p>
+            <p id="quality" hidden></p>
+        </div>
         <details class="more">
             <summary aria-label="More options" title="More">More</summary>
             <div class="more-panel">
+                <label for="cam-device">Camera</label>
+                <select id="cam-device"></select>
+                <label for="mic-device">Microphone</label>
+                <select id="mic-device"></select>
                 <button id="report" type="button">Report</button>
                 <button id="block" type="button">Block</button>
                 <a href="{{ route('guidelines') }}">Community Guidelines</a>
@@ -91,7 +98,7 @@
                         <option value="{{ $code }}" @selected($preference->country_preference === $code)>{{ \App\Support\Countries::flag($code) }} {{ $name }}</option>
                     @endforeach
                 </select>
-                <p class="fine">Premium filters coming soon</p>
+                <p class="fine">@if (config('features.preference_matching')) Preferences are used when pairing. @else Preferences are saved. They do not change matching yet. @endif</p>
                 <button type="submit">Save Preferences</button>
             </form>
         </details>
@@ -99,7 +106,9 @@
 
     <script type="application/json" id="ice-servers">@json($iceServers)</script>
     <script type="application/json" id="reverb-config">@json($reverb)</script>
+    <script src="{{ asset('js/room-state.js') }}?v={{ filemtime(public_path('js/room-state.js')) }}"></script>
     <script src="{{ route('webrtc.script') }}"></script>
     <script src="{{ asset('js/room-ui.js') }}?v={{ filemtime(public_path('js/room-ui.js')) }}"></script>
+    <script src="{{ asset('js/pulse.js') }}?v={{ filemtime(public_path('js/pulse.js')) }}"></script>
 </body>
 </html>

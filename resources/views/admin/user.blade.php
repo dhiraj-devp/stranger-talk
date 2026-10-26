@@ -8,6 +8,38 @@
     </p>
     @if ($user->ban_reason)<p>Ban reason: {{ $user->ban_reason }}</p>@endif
 
+    @if (auth()->user()->staffRole() === 'admin')
+        <form class="panel stack" method="POST" action="{{ route('admin.users.update', $user) }}">
+            @csrf
+            <h2>Account</h2>
+            <label for="name">Name <input id="name" name="name" value="{{ $user->name }}" required></label>
+            <label for="gender">Gender
+                <select id="gender" name="gender">
+                    <option value="">Unset</option>
+                    @foreach (['male', 'female', 'other', 'undisclosed'] as $gender)
+                        <option value="{{ $gender }}" @selected($user->gender === $gender)>{{ $gender }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label for="country_code">Country code <input id="country_code" name="country_code" maxlength="2" value="{{ $user->country_code }}"></label>
+            <label for="role">Role
+                <select id="role" name="role">
+                    @foreach (['member', 'analyst', 'moderator', 'admin'] as $role)
+                        <option value="{{ $role }}" @selected($user->staffRole() === $role)>{{ $role }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label for="status">Status
+                <select id="status" name="status">
+                    @foreach (['active', 'offline', 'searching', 'in_call', 'banned'] as $status)
+                        <option value="{{ $status }}" @selected($user->status === $status)>{{ $status }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <button type="submit">Save user</button>
+        </form>
+    @endif
+
     <div class="split">
         <form class="panel" method="POST" action="{{ route('admin.users.ban', $user) }}">
             @csrf

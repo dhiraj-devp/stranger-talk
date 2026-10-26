@@ -9,7 +9,7 @@
             <tbody>
             @foreach ($matches as $match)
                 <tr>
-                    <td>#{{ $match->id }}</td>
+                    <td><a href="{{ route('admin.matches.show', $match) }}">#{{ $match->id }}</a></td>
                     <td>{{ $match->userOne->name ?? 'User' }} @if ($match->userTwo) / {{ $match->userTwo->name }} @endif</td>
                     <td><span class="badge">{{ $match->status }}</span></td>
                     <td>{{ $match->end_reason ?: '—' }}</td>

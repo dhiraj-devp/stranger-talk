@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MatchPreference;
+use App\Services\AnalyticsRecorder;
 use App\Models\User;
 use App\Services\CountrySuggester;
 use App\Support\Countries;
@@ -38,6 +39,7 @@ class ProfileController extends Controller
             ['user_id' => $request->user()->id],
             ['gender_preference' => MatchPreference::ANYONE, 'country_preference' => null]
         );
+        app(AnalyticsRecorder::class)->track($request->user(), 'profile_completed');
 
         return redirect()->route('home');
     }
