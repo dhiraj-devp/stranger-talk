@@ -82,10 +82,6 @@
             </section>
             <div id="local-wrap" class="pane local-wrap">
                 <video id="local" autoplay playsinline muted></video>
-                <div class="pane-loading" id="local-loading">
-                    <span class="spinner" aria-hidden="true"></span>
-                    <p>Finding someone</p>
-                </div>
                 <p class="identity">
                     <strong id="local-name">{{ $me->name }}</strong>
                     <span id="local-country">{{ $meCountry }}</span>
