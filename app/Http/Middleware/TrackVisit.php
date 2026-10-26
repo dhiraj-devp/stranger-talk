@@ -26,6 +26,7 @@ class TrackVisit
                 cookie()->queue(cookie('koko_vid', $key, 60 * 24, '/', null, $request->isSecure(), true, false, 'lax'));
             }
 
+            $ip = filter_var($request->ip(), FILTER_VALIDATE_IP) ? $request->ip() : null;
             $visit = Visit::query()->firstOrCreate(
                 ['key' => $key],
                 [
@@ -33,9 +34,13 @@ class TrackVisit
                     'referrer_host' => $this->referrer($request),
                     'device' => $this->device($request),
                     'country' => $this->country($request),
+                    'ip_address' => $ip,
                     'started_at' => now(),
                 ]
             );
+            if ($ip && $visit->ip_address === null) {
+                $visit->forceFill(['ip_address' => $ip])->save();
+            }
 
             PageView::query()->create([
                 'visit_id' => $visit->id,

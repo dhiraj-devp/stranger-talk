@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\MatchPreference;
 use App\Models\Report;
 use App\Models\User;
+use App\Models\Visit;
 use App\Models\VideoMatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -315,6 +316,21 @@ class PlatformTest extends TestCase
 
         $this->artisan('platform:cleanup')->assertSuccessful();
         $this->assertSame(VideoMatch::EXPIRED, $match->fresh()->status);
+    }
+
+    public function test_signed_out_traffic_stores_an_ip_and_admin_sees_the_hourly_report(): void
+    {
+        $this->get('/')->assertOk();
+        $this->assertNotNull(Visit::query()->first()->ip_address);
+
+        $admin = User::factory()->create();
+        $admin->forceFill(['is_admin' => true, 'role' => 'admin'])->save();
+        $this->actingAs($admin)->get('/admin/analytics/traffic')
+            ->assertOk()
+            ->assertSee('Page views')
+            ->assertSee('Unique addresses')
+            ->assertSee('00:00')
+            ->assertSee('Hours on');
     }
 
     public function test_control_center_access_filters_and_step_up(): void

@@ -9,7 +9,7 @@ class Visit extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['key', 'first_path', 'referrer_host', 'device', 'country', 'started_at'];
+    protected $fillable = ['key', 'first_path', 'referrer_host', 'device', 'country', 'ip_address', 'started_at'];
 
     protected function casts(): array
     {

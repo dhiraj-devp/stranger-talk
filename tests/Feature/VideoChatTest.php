@@ -165,6 +165,8 @@ class VideoChatTest extends TestCase
             ->assertSee('chat.js', false)
             ->assertSee($user->name)
             ->assertDontSee('end-to-end', false)
+            ->assertDontSee('Find Another')
+            ->assertDontSee('Saved with this match', false)
             ->assertDontSee('id="camera"', false);
     }
 

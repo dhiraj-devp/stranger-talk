@@ -100,15 +100,15 @@
                 <button id="chat-report" type="button">Report</button>
                 <button id="chat-close" type="button" aria-label="Close chat">Close</button>
             </div>
-            <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-relevant="additions"></div>
-            <p id="chat-empty" class="chat-empty">Messages appear here once you are matched. They stay with this match only.</p>
-            <p id="chat-error" class="chat-error" hidden></p>
+            <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-relevant="additions">
+                <p id="chat-empty" class="chat-empty">Messages appear here once you are matched. They stay with this match only.</p>
+                <p id="chat-error" class="chat-error" hidden></p>
+            </div>
             <form id="chat-form" class="chat-form">
                 <label class="visually-hidden" for="chat-input">Message</label>
                 <textarea id="chat-input" maxlength="500" rows="2" placeholder="Waiting for a match" disabled></textarea>
                 <button id="chat-send" type="submit" disabled>Send</button>
             </form>
-            <p class="chat-note">Saved with this match for {{ (int) config('platform.retention.match_events_days', 90) }} days.</p>
         </aside>
     </div>
 
@@ -131,7 +131,6 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12v2H6V8Zm1 4h10l-1 7H8l-1-7Z"/></svg>
                 <span>End</span>
             </button>
-            <button id="again" type="button" hidden>Find Another</button>
         </div>
 
         <form id="report-box" hidden>

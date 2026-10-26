@@ -42,7 +42,7 @@
             @endif
             <p class="side-label">Analytics</p>
             <nav aria-label="Analytics">
-                @foreach (['overview' => 'Overview', 'acquisition' => 'Acquisition', 'funnel' => 'Funnel', 'calls' => 'Calls', 'geography' => 'Geography', 'devices' => 'Devices', 'content' => 'Content', 'moderation' => 'Moderation'] as $key => $label)
+                @foreach (['overview' => 'Overview', 'traffic' => 'Traffic', 'acquisition' => 'Acquisition', 'funnel' => 'Funnel', 'calls' => 'Calls', 'geography' => 'Geography', 'devices' => 'Devices', 'content' => 'Content', 'moderation' => 'Moderation'] as $key => $label)
                     <a href="{{ route('admin.analytics', ['section' => $key]) }}" @class(['is-on' => request()->routeIs('admin.analytics') && request()->route('section', 'overview') === $key])>{{ $label }}</a>
                 @endforeach
             </nav>

@@ -53,9 +53,15 @@
         after = 0;
         misses = 0;
         seen.clear();
-        log.replaceChildren();
-        if (empty) empty.hidden = false;
-        if (errorEl) errorEl.hidden = true;
+        log.querySelectorAll('.bubble').forEach(function (node) { node.remove(); });
+        if (empty) {
+            empty.hidden = false;
+            if (!log.contains(empty)) log.prepend(empty);
+        }
+        if (errorEl) {
+            errorEl.hidden = true;
+            if (!log.contains(errorEl)) log.append(errorEl);
+        }
         setUnread(0);
     }
 

@@ -76,7 +76,23 @@ function paintPartner(data) {
     }
 }
 
-nextBtn.addEventListener('click', onNext);
+nextBtn.addEventListener('click', function () {
+    if (busy) return;
+    const live = document.body.classList.contains('room-live') && !endingUi;
+    if (live && nextBtn.querySelector('span') && nextBtn.querySelector('span').textContent !== 'Confirm') {
+        label(nextBtn, 'Confirm', false);
+        return;
+    }
+    label(nextBtn, 'Next', false);
+    if (endingUi) {
+        pageToken = newToken();
+        busy = false;
+        endingUi = false;
+        start();
+        return;
+    }
+    onNext();
+});
 endBtn.addEventListener('click', onEnd);
 if (reportBtn && reportBox) {
     reportBtn.addEventListener('click', () => {
@@ -109,12 +125,14 @@ if (blockBtn) {
         onStrangerGone('blocked');
     });
 }
-againBtn.addEventListener('click', () => {
-    pageToken = newToken();
-    busy = false;
-    endingUi = false;
-    start();
-});
+if (againBtn) {
+    againBtn.addEventListener('click', () => {
+        pageToken = newToken();
+        busy = false;
+        endingUi = false;
+        start();
+    });
+}
 
 document.body.addEventListener('click', () => {
     if (!audioTip.hidden && remoteVideo.srcObject) {
@@ -150,7 +168,7 @@ async function start() {
     joined = false;
     misses = 0;
     resetPeerState();
-    againBtn.hidden = true;
+    if (againBtn) againBtn.hidden = true;
     nextBtn.disabled = false;
     endBtn.disabled = false;
     muteBtn.disabled = true;
@@ -202,7 +220,7 @@ async function onNext() {
     resetPeerState();
     searchingAgain = true;
     setStatus('Finding someone...');
-    againBtn.hidden = true;
+    if (againBtn) againBtn.hidden = true;
 
     try {
         const data = await api('/match/next', {
@@ -451,13 +469,10 @@ async function flushPending() {
 
 function onStrangerGone(source) {
     if (source === 'webrtc-failed' || source === 'failed') {
-        againBtn.textContent = 'Try Again';
         failCall('Connection failed', true);
     } else if (source === 'poll-miss') {
-        againBtn.textContent = 'Try Again';
         failCall('Connection problem', true);
     } else {
-        againBtn.textContent = 'Find Another';
         failCall('Stranger disconnected', true);
     }
 }
@@ -486,8 +501,8 @@ function failCall(message, notify) {
             window.RoomState.set('ended');
         }
     }
-    againBtn.hidden = false;
-    nextBtn.disabled = true;
+    if (againBtn) againBtn.hidden = true;
+    nextBtn.disabled = false;
     muteBtn.disabled = true;
     cameraReady(false);
     endBtn.disabled = false;
@@ -602,6 +617,9 @@ function setStatus(text) {
         'Connection problem': 'reconnecting',
     };
     if (map[text]) window.RoomState.set(map[text]);
+    if (text !== 'Connected' && nextBtn.querySelector('span') && nextBtn.querySelector('span').textContent === 'Confirm') {
+        label(nextBtn, 'Next', false);
+    }
 }
 
 let qualityTimer = null;
