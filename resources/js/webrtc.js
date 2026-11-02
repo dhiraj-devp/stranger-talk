@@ -32,6 +32,7 @@ let epoch = 0;
 let micOn = true;
 let camOn = true;
 let iceRestarted = false;
+let remoteSoundOn = false;
 let searchingAgain = false;
 let reverbSocket = null;
 let reverbSocketId = null;
@@ -65,14 +66,18 @@ function cameraReady(ready) {
 function paintPartner(data) {
     const nameEl = document.getElementById('remote-name');
     const countryEl = document.getElementById('remote-country');
+    const loadingText = document.querySelector('#remote-loading p');
     if (!nameEl) return;
     const partner = data && data.partner;
     if (partner && partner.name) {
         nameEl.textContent = partner.name;
         if (countryEl) countryEl.textContent = partner.country || '';
+        if (loadingText) loadingText.textContent = 'Connecting...';
     } else {
         nameEl.textContent = 'Finding a match';
         if (countryEl) countryEl.textContent = '';
+        if (loadingText) loadingText.textContent = 'Finding someone';
+        document.body.classList.remove('has-remote');
     }
 }
 
@@ -136,6 +141,9 @@ if (againBtn) {
 
 document.body.addEventListener('click', () => {
     if (!audioTip.hidden && remoteVideo.srcObject) {
+        remoteVideo.muted = false;
+        remoteVideo.removeAttribute('muted');
+        remoteSoundOn = true;
         remoteVideo.play().then(() => {
             audioTip.hidden = true;
         }).catch(() => {});
@@ -377,10 +385,22 @@ async function ensurePeer(role) {
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
     pc.ontrack = (event) => {
-        remoteVideo.srcObject = event.streams[0] || new MediaStream([event.track]);
-        remoteVideo.play().catch(() => {
-            audioTip.hidden = false;
-        });
+        let stream = remoteVideo.srcObject;
+        if (!(stream instanceof MediaStream)) {
+            stream = (event.streams && event.streams[0]) || new MediaStream();
+            remoteVideo.srcObject = stream;
+        }
+        if (event.track && !stream.getTracks().some((track) => track.id === event.track.id)) {
+            stream.addTrack(event.track);
+        }
+        if (!remoteSoundOn) {
+            remoteVideo.muted = true;
+            remoteVideo.setAttribute('muted', '');
+        }
+        remoteVideo.playsInline = true;
+        document.body.classList.add('has-remote');
+        remoteVideo.play().catch(() => {});
+        if (!remoteSoundOn) audioTip.hidden = false;
     };
 
     pc.onicecandidate = (event) => {
@@ -527,6 +547,8 @@ function stopMedia() {
     localStream = null;
     localVideo.srcObject = null;
     remoteVideo.srcObject = null;
+    remoteSoundOn = false;
+    document.body.classList.remove('has-remote');
 }
 
 function mediaConstraints() {
@@ -575,6 +597,7 @@ async function ensureMedia() {
 function resetPeerState() {
     offerApplied = false;
     answerApplied = false;
+    remoteSoundOn = false;
     pendingCandidates = [];
     cursor = 0;
     iceRestarted = false;

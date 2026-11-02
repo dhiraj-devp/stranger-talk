@@ -9,8 +9,8 @@ use App\Models\VideoMatch;
 use App\Services\AnalyticsRecorder;
 use App\Services\MatchmakingService;
 use App\Services\PresenceService;
+use App\Services\SafetyService;
 use App\Support\Countries;
-use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -45,12 +45,17 @@ class MatchController extends Controller
         $token = $this->token($request);
         $user = $request->user();
         $cursor = max(0, (int) $request->query('cursor', 0));
+        $this->expireAbandonedSometimes();
         $match = $this->matchByToken($user, $token);
 
         if (! $match) {
             $status = $this->activeFor($user) ? 'replaced' : 'idle';
 
             return $this->json(['status' => $status]);
+        }
+
+        if ($match->status === VideoMatch::WAITING) {
+            $match = $this->adoptWaiter($user, $match);
         }
 
         if ($match->status !== VideoMatch::ENDED) {
@@ -149,12 +154,9 @@ class MatchController extends Controller
             return $denied;
         }
 
-        $match = $this->withMatchLock(function () use ($user, $data) {
-            $this->endTokenMatch($user, $data['token'], 'next');
-            $this->expireAbandoned();
-
-            return $this->pairOrQueue($user, $data['next_token']);
-        });
+        $this->expireAbandonedSometimes();
+        $this->endTokenMatch($user, $data['token'], 'next');
+        $match = $this->pairOrQueue($user, $data['next_token']);
 
         return $this->json($this->present($match, $user, 0));
     }
@@ -179,9 +181,9 @@ class MatchController extends Controller
 
     private function enqueue(User $user, string $token): VideoMatch
     {
-        return $this->withMatchLock(function () use ($user, $token) {
-            $this->expireAbandoned();
+        $this->expireAbandonedSometimes();
 
+        $existing = DB::transaction(function () use ($user, $token) {
             $active = VideoMatch::query()->active()->forUser($user->id)->orderBy('id')->lockForUpdate()->get();
             $same = $active->first(fn (VideoMatch $match) => $match->tokenFor($user->id) === $token);
 
@@ -198,40 +200,21 @@ class MatchController extends Controller
                 $match->save();
             }
 
-            return $this->pairOrQueue($user, $token);
+            return null;
         });
+
+        return $existing ?? $this->pairOrQueue($user, $token);
     }
 
+    /**
+     * Claim one waiting person, or join the queue. Each attempt locks only the
+     * rows it needs, so many people can be paired at the same time.
+     */
     private function pairOrQueue(User $user, string $token): VideoMatch
     {
-        $matchmaking = app(MatchmakingService::class);
-        $waiters = VideoMatch::query()
-            ->where('status', VideoMatch::WAITING)
-            ->whereNull('user_two_id')
-            ->where('user_one_id', '!=', $user->id)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->limit(25)
-            ->get();
-
-        foreach ($waiters as $waiting) {
-            $partner = User::query()->find($waiting->user_one_id);
-            if (! $matchmaking->canPair($user, $partner)) {
-                continue;
-            }
-
-            $waiting->user_two_id = $user->id;
-            $waiting->user_two_token = $token;
-            $waiting->user_two_seen_at = now();
-            $waiting->status = VideoMatch::CONNECTING;
-            $waiting->save();
-            User::query()->whereKey([$user->id, $waiting->user_one_id])->update(['status' => User::IN_CALL, 'last_seen_at' => now()]);
-            MatchEvent::write($waiting->id, $user->id, MatchEvent::CREATED);
-            app(PresenceService::class)->touch($user->id, 'in_call');
-            app(AnalyticsRecorder::class)->track($user, 'match_created');
-            $this->broadcast($waiting);
-
-            return $waiting;
+        $claimed = $this->claimOldest($user, $token);
+        if ($claimed) {
+            return $claimed;
         }
 
         $created = VideoMatch::query()->create([
@@ -245,6 +228,165 @@ class MatchController extends Controller
         app(PresenceService::class)->touch($user->id, 'searching');
 
         return $created;
+    }
+
+    private function claimOldest(User $user, string $token): ?VideoMatch
+    {
+        $cutoff = now()->subSeconds(self::STALE_SECONDS);
+        $ids = $this->openWaiterIds($user->id, $cutoff);
+
+        foreach ($ids as $id) {
+            $claimed = DB::transaction(function () use ($id, $user, $token) {
+                $waiting = VideoMatch::query()->whereKey($id)->lockForUpdate()->first();
+                if (! $this->isOpenWait($waiting)) {
+                    return null;
+                }
+
+                $partner = User::query()->find($waiting->user_one_id);
+                if (! app(MatchmakingService::class)->canPair($user, $partner)) {
+                    return null;
+                }
+
+                $waiting->user_two_id = $user->id;
+                $waiting->user_two_token = $token;
+                $waiting->user_two_seen_at = now();
+                $waiting->status = VideoMatch::CONNECTING;
+                $waiting->save();
+                $this->rememberPair($waiting, $user, (int) $waiting->user_one_id);
+
+                return $waiting;
+            });
+
+            if ($claimed) {
+                return $claimed;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * People already in the queue pair from their poll. The two rows are locked
+     * in id order so two searches cannot claim each other or form two calls.
+     */
+    private function adoptWaiter(User $user, VideoMatch $current): VideoMatch
+    {
+        $token = $current->tokenFor($user->id);
+        if ($token === null || ! $this->isOpenWait($current)) {
+            return $current;
+        }
+
+        $cutoff = now()->subSeconds(self::STALE_SECONDS);
+        foreach ($this->openWaiterIds($user->id, $cutoff, $current->id) as $id) {
+            $joined = $this->tryJoin($user, (int) $current->id, (int) $id);
+            if ($joined instanceof VideoMatch) {
+                return $joined;
+            }
+            if ($joined === false) {
+                return $this->matchByToken($user, $token) ?? $current;
+            }
+        }
+
+        return VideoMatch::query()->find($current->id) ?? $current;
+    }
+
+    private function tryJoin(User $user, int $mineId, int $otherId): VideoMatch|false|null
+    {
+        return DB::transaction(function () use ($user, $mineId, $otherId) {
+            $ids = [$mineId, $otherId];
+            sort($ids);
+            $locked = VideoMatch::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $mine = $locked->get($mineId);
+            $other = $locked->get($otherId);
+
+            if (! $this->isOpenWait($mine)) {
+                return false;
+            }
+            if (! $this->isOpenWait($other)) {
+                return null;
+            }
+
+            $partner = User::query()->find($other->user_one_id);
+            if (! app(MatchmakingService::class)->canPair($user, $partner)) {
+                return null;
+            }
+
+            $older = $mine->id < $other->id ? $mine : $other;
+            $newer = $older->id === $mine->id ? $other : $mine;
+            $older->user_two_id = $newer->user_one_id;
+            $older->user_two_token = $newer->user_one_token;
+            $older->user_two_seen_at = now();
+            $older->status = VideoMatch::CONNECTING;
+            $older->save();
+
+            $newer->user_one_token = null;
+            $newer->status = VideoMatch::ENDED;
+            $newer->end_reason = 'paired';
+            $newer->ended_at = now();
+            $newer->save();
+
+            $this->rememberPair($older, $user, (int) $older->user_one_id === $user->id ? (int) $newer->user_one_id : (int) $older->user_one_id);
+
+            return $older->fresh();
+        });
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function openWaiterIds(int $userId, \Illuminate\Support\Carbon $cutoff, ?int $exceptId = null): array
+    {
+        $blocked = app(SafetyService::class)->blockedIds($userId);
+
+        return VideoMatch::query()
+            ->where('status', VideoMatch::WAITING)
+            ->whereNull('user_two_id')
+            ->where('user_one_id', '!=', $userId)
+            ->when($exceptId, fn ($query) => $query->where('id', '!=', $exceptId))
+            ->when($blocked !== [], fn ($query) => $query->whereNotIn('user_one_id', $blocked))
+            ->where('user_one_seen_at', '>=', $cutoff)
+            ->orderBy('id')
+            ->limit(25)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    private function isOpenWait(?VideoMatch $match): bool
+    {
+        return $match !== null
+            && $match->status === VideoMatch::WAITING
+            && $match->user_two_id === null
+            && $match->user_one_token !== null;
+    }
+
+    private function rememberPair(VideoMatch $match, User $actor, int $partnerId): void
+    {
+        User::query()->whereKey([$actor->id, $partnerId])->update(['status' => User::IN_CALL, 'last_seen_at' => now()]);
+        MatchEvent::write($match->id, $actor->id, MatchEvent::CREATED);
+        app(PresenceService::class)->touch($actor->id, 'in_call');
+        app(AnalyticsRecorder::class)->track($actor, 'match_created');
+        $this->broadcast($match);
+    }
+
+    private function expireAbandonedSometimes(): void
+    {
+        static $next = 0.0;
+        $now = microtime(true);
+        if ($now < $next) {
+            return;
+        }
+        $next = $now + 5;
+
+        try {
+            if (! Cache::add('stranger-expire-abandoned', 1, 5)) {
+                return;
+            }
+        } catch (\Throwable) {
+            return;
+        }
+
+        $this->expireAbandoned();
     }
 
     private function heartbeat(VideoMatch $match, User $user): VideoMatch
@@ -354,22 +496,6 @@ class MatchController extends Controller
             $match->user_one_seen_at = now();
         } elseif ($match->user_two_id === $userId) {
             $match->user_two_seen_at = now();
-        }
-    }
-
-    /**
-     * @template T
-     * @param  callable(): T  $callback
-     * @return T
-     */
-    private function withMatchLock(callable $callback): mixed
-    {
-        try {
-            return Cache::lock('stranger-matchmaking', 8)->block(5, function () use ($callback) {
-                return DB::transaction($callback);
-            });
-        } catch (LockTimeoutException) {
-            abort(503, 'Matching is busy. Please try again.');
         }
     }
 

@@ -142,6 +142,19 @@ class VideoChatTest extends TestCase
             ->assertJsonPath('end_reason', 'disconnect');
     }
 
+    public function test_remote_video_is_not_covered_once_the_picture_arrives(): void
+    {
+        $css = file_get_contents(public_path('css/room.css'));
+        $script = file_get_contents(resource_path('js/webrtc.js'));
+
+        $this->assertStringContainsString('body.room-connecting:not(.has-remote) #remote-loading', $css);
+        $this->assertStringContainsString('body.has-remote #remote-loading { display: none; }', $css);
+        $this->assertStringNotContainsString("body.room-connecting #remote-loading,\n", $css);
+        $this->assertStringContainsString("document.body.classList.add('has-remote')", $script);
+        $this->assertStringContainsString('remoteVideo.muted = true', $script);
+        $this->assertStringContainsString("loadingText.textContent = 'Connecting...'", $script);
+    }
+
     public function test_turn_secret_is_hidden_until_turn_is_configured(): void
     {
         config([
@@ -253,6 +266,63 @@ class VideoChatTest extends TestCase
             'client_id' => 'rate-2',
             'body' => 'two',
         ])->assertStatus(429);
+    }
+
+    public function test_a_crowd_pairs_without_putting_anyone_in_two_calls(): void
+    {
+        $users = User::factory()->count(40)->create();
+        foreach ($users as $user) {
+            VideoMatch::query()->create([
+                'user_one_id' => $user->id,
+                'user_one_token' => 'crowd-'.$user->id,
+                'user_one_seen_at' => now(),
+                'status' => VideoMatch::WAITING,
+                'signal' => ['offer' => null, 'answer' => null, 'candidates' => []],
+            ]);
+        }
+
+        foreach ($users as $user) {
+            $this->actingAs($user)->getJson('/match/poll?token=crowd-'.$user->id.'&cursor=0')->assertOk();
+        }
+
+        $this->assertSame(0, VideoMatch::query()->where('status', VideoMatch::WAITING)->count());
+        $connected = VideoMatch::query()->where('status', VideoMatch::CONNECTING)->get();
+        $this->assertCount(20, $connected);
+        $ids = $connected->flatMap(fn (VideoMatch $match) => [$match->user_one_id, $match->user_two_id]);
+        $this->assertCount(40, $ids->unique());
+        $this->assertCount(0, $ids->duplicates());
+    }
+
+    public function test_people_already_searching_pair_on_poll(): void
+    {
+        $tokens = [];
+        foreach (['a', 'b', 'c'] as $label) {
+            $user = User::factory()->create();
+            $token = 'wait-'.$label;
+            $tokens[$label] = $user;
+            VideoMatch::query()->create([
+                'user_one_id' => $user->id,
+                'user_one_token' => $token,
+                'user_one_seen_at' => now(),
+                'status' => VideoMatch::WAITING,
+                'signal' => ['offer' => null, 'answer' => null, 'candidates' => []],
+            ]);
+        }
+
+        $this->actingAs($tokens['a'])->getJson('/match/poll?token=wait-a&cursor=0')
+            ->assertOk()
+            ->assertJsonPath('status', 'connecting')
+            ->assertJsonPath('partner.name', $tokens['b']->name);
+        $this->actingAs($tokens['b'])->getJson('/match/poll?token=wait-b&cursor=0')
+            ->assertOk()
+            ->assertJsonPath('status', 'connecting')
+            ->assertJsonPath('partner.name', $tokens['a']->name);
+        $this->actingAs($tokens['c'])->getJson('/match/poll?token=wait-c&cursor=0')
+            ->assertOk()
+            ->assertJsonPath('status', 'waiting');
+
+        $this->assertSame(1, VideoMatch::query()->where('status', VideoMatch::WAITING)->count());
+        $this->assertSame(1, VideoMatch::query()->where('status', VideoMatch::CONNECTING)->count());
     }
 
     /**

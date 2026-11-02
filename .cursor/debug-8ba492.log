@@ -1,0 +1,31 @@
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":2,"matchId":2,"otherWaiters":2},"timestamp":1793387751309}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":3,"matchId":3,"otherWaiters":2},"timestamp":1793387751309}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387751309}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387751309}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":1,"matchId":1,"otherWaiters":2},"timestamp":1793387751310}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387751310}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"poll candidate checked","data":{"userId":2,"partnerId":1,"allowed":true,"preferenceMatching":false},"timestamp":1793387751486}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"paired while waiting","data":{"userId":2,"partnerId":1,"matchId":1,"status":"connecting"},"timestamp":1793387753029}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"still waiting after poll pair","data":{"userId":3,"matchId":3,"waiterCount":0},"timestamp":1793387753256}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753552}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"C","location":"MatchController.php","message":"queued with no pair","data":{"userId":1,"waiterCount":0,"waiterIds":[],"cacheStore":"file"},"timestamp":1793387753555}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753595}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"candidate checked","data":{"userId":2,"partnerId":1,"allowed":true,"preferenceMatching":false},"timestamp":1793387753598}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":1,"matchId":5,"otherWaiters":2},"timestamp":1793387753669}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753669}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"poll candidate checked","data":{"userId":1,"partnerId":2,"allowed":true,"preferenceMatching":false},"timestamp":1793387753672}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"paired while waiting","data":{"userId":1,"partnerId":2,"matchId":6,"status":"connecting"},"timestamp":1793387753675}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753685}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"candidate checked","data":{"userId":1,"partnerId":3,"allowed":true,"preferenceMatching":false},"timestamp":1793387753689}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":1,"matchId":8,"otherWaiters":1},"timestamp":1793387753733}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753733}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"poll candidate checked","data":{"userId":1,"partnerId":2,"allowed":false,"preferenceMatching":false},"timestamp":1793387753736}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"still waiting after poll pair","data":{"userId":1,"matchId":8,"waiterCount":1},"timestamp":1793387753736}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":2,"matchId":9,"otherWaiters":1},"timestamp":1793387753741}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753742}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"poll candidate checked","data":{"userId":2,"partnerId":1,"allowed":false,"preferenceMatching":false},"timestamp":1793387753744}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"still waiting after poll pair","data":{"userId":2,"matchId":9,"waiterCount":1},"timestamp":1793387753744}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"poll while waiting","data":{"userId":3,"matchId":10,"otherWaiters":2},"timestamp":1793387753759}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"A","location":"MatchController.php","message":"lock enter","data":{"cacheStore":"file"},"timestamp":1793387753759}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"B","location":"MatchController.php","message":"poll candidate checked","data":{"userId":3,"partnerId":1,"allowed":true,"preferenceMatching":false},"timestamp":1793387753761}
+{"sessionId":"8ba492","runId":"probe","hypothesisId":"D","location":"MatchController.php","message":"paired while waiting","data":{"userId":3,"partnerId":1,"matchId":8,"status":"connecting"},"timestamp":1793387753764}

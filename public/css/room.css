@@ -215,8 +215,9 @@ body.chat-open .dock { right: 320px; }
 }
 body.room-searching #remote-loading,
 body.is-skipping #remote-loading,
-body.room-connecting #remote-loading,
-body.room-permissions #remote-loading { display: flex; }
+body.room-permissions #remote-loading,
+body.room-connecting:not(.has-remote) #remote-loading { display: flex; }
+body.has-remote #remote-loading { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .audio-tip {
     position: absolute;
