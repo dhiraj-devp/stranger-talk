@@ -20,17 +20,15 @@ class CleanupPlatform extends Command
 
     public function handle(): int
     {
-        $cutoff = now()->subSeconds((int) config('platform.stale_seconds', 30));
-
         VideoMatch::query()
             ->where('status', VideoMatch::WAITING)
-            ->where('user_one_seen_at', '<', $cutoff)
+            ->where('user_one_seen_at', '<', now()->subSeconds(20))
             ->update(['status' => VideoMatch::EXPIRED, 'end_reason' => 'disconnect', 'updated_at' => now()]);
 
         VideoMatch::query()
             ->whereIn('status', [VideoMatch::CONNECTING, VideoMatch::CONNECTED])
-            ->where('user_one_seen_at', '<', $cutoff)
-            ->where('user_two_seen_at', '<', $cutoff)
+            ->where('user_one_seen_at', '<', now()->subSeconds(45))
+            ->where('user_two_seen_at', '<', now()->subSeconds(45))
             ->update(['status' => VideoMatch::EXPIRED, 'end_reason' => 'disconnect', 'updated_at' => now()]);
 
         User::query()

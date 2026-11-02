@@ -156,7 +156,7 @@
         stick(true);
         input.value = '';
         try {
-            const response = await fetch('/match/messages', {
+            const sendOnce = () => fetch('/match/messages', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
@@ -166,6 +166,10 @@
                 },
                 body: JSON.stringify({ token: token, client_id: clientId, body: body }),
             });
+            let response = await sendOnce();
+            if (!response.ok && response.status !== 403 && response.status !== 404 && response.status !== 409 && response.status !== 422) {
+                response = await sendOnce();
+            }
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.message || 'Message was not sent.');
             const row = log.querySelector('[data-key="' + CSS.escape(clientId) + '"]');

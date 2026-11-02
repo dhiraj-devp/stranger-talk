@@ -13,11 +13,26 @@ class IceServers
     public static function list(): array
     {
         $servers = [];
+        $configured = [];
 
         foreach (config('webrtc.stun_urls', []) as $url) {
             if (is_string($url) && $url !== '') {
-                $servers[] = ['urls' => $url];
+                $configured[] = $url;
             }
+        }
+
+        foreach ([
+            'stun:stun.l.google.com:19302',
+            'stun:stun1.l.google.com:19302',
+            'stun:stun.cloudflare.com:3478',
+        ] as $url) {
+            if (! in_array($url, $configured, true)) {
+                $configured[] = $url;
+            }
+        }
+
+        foreach ($configured as $url) {
+            $servers[] = ['urls' => $url];
         }
 
         $turnUrl = config('webrtc.turn.url');

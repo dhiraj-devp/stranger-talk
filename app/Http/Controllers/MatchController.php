@@ -19,7 +19,9 @@ use Illuminate\Validation\ValidationException;
 
 class MatchController extends Controller
 {
-    private const STALE_SECONDS = 12;
+    private const QUEUE_STALE_SECONDS = 20;
+
+    private const CALL_STALE_SECONDS = 45;
 
     private const MAX_CANDIDATES = 300;
 
@@ -92,7 +94,8 @@ class MatchController extends Controller
             abort(403, 'You cannot send that signal.');
         }
 
-        DB::transaction(function () use ($match, $user, $type, $payload, $isOfferer) {
+        $version = 0;
+        DB::transaction(function () use ($match, $user, $type, $payload, $isOfferer, &$version) {
             $locked = VideoMatch::query()->whereKey($match->id)->lockForUpdate()->first();
 
             if (! $locked || $locked->status === VideoMatch::ENDED || $locked->user_two_id === null) {
@@ -102,13 +105,29 @@ class MatchController extends Controller
             $signal = $locked->signal ?? ['offer' => null, 'answer' => null, 'candidates' => []];
 
             if ($type === 'offer') {
-                $signal['offer'] = $signal['offer'] ?? $this->sessionDescription($payload, 'offer');
+                $description = $this->sessionDescription($payload, 'offer');
+                $previous = $signal['offer']['sdp'] ?? null;
+                $current = (int) ($signal['v'] ?? 0);
+                if (! is_string($previous)) {
+                    $signal['v'] = $current > 0 ? $current : 1;
+                } elseif ($previous !== $description['sdp']) {
+                    $signal['v'] = $current + 1;
+                    $signal['answer'] = null;
+                    $signal['candidates'] = [];
+                }
+                $signal['offer'] = $description;
             } elseif ($type === 'answer') {
-                $signal['answer'] = $signal['answer'] ?? $this->sessionDescription($payload, 'answer');
+                $given = array_key_exists('v', $payload) ? (int) $payload['v'] : null;
+                $current = (int) ($signal['v'] ?? 0);
+                if ($given === null || $current === 0 || $given === $current) {
+                    $signal['answer'] = $signal['answer'] ?? $this->sessionDescription($payload, 'answer');
+                }
             } elseif ($type === 'candidate') {
+                $given = array_key_exists('v', $payload) ? (int) $payload['v'] : null;
+                $current = (int) ($signal['v'] ?? 0);
                 $candidates = $signal['candidates'] ?? [];
 
-                if (count($candidates) < self::MAX_CANDIDATES) {
+                if (($given === null || $current === 0 || $given === $current) && count($candidates) < self::MAX_CANDIDATES) {
                     $lastId = 0;
 
                     foreach ($candidates as $item) {
@@ -137,10 +156,11 @@ class MatchController extends Controller
 
             $locked->signal = $signal;
             $locked->save();
+            $version = (int) ($signal['v'] ?? 0);
             $this->afterSignal($locked, $user, $type);
         });
 
-        return $this->json(['ok' => true]);
+        return $this->json(['ok' => true, 'v' => $version]);
     }
 
     public function next(Request $request): JsonResponse
@@ -232,7 +252,7 @@ class MatchController extends Controller
 
     private function claimOldest(User $user, string $token): ?VideoMatch
     {
-        $cutoff = now()->subSeconds(self::STALE_SECONDS);
+        $cutoff = now()->subSeconds(self::QUEUE_STALE_SECONDS);
         $ids = $this->openWaiterIds($user->id, $cutoff);
 
         foreach ($ids as $id) {
@@ -276,7 +296,7 @@ class MatchController extends Controller
             return $current;
         }
 
-        $cutoff = now()->subSeconds(self::STALE_SECONDS);
+        $cutoff = now()->subSeconds(self::QUEUE_STALE_SECONDS);
         foreach ($this->openWaiterIds($user->id, $cutoff, $current->id) as $id) {
             $joined = $this->tryJoin($user, (int) $current->id, (int) $id);
             if ($joined instanceof VideoMatch) {
@@ -404,7 +424,7 @@ class MatchController extends Controller
                 ? $locked->user_two_seen_at
                 : $locked->user_one_seen_at;
 
-            if ($locked->user_two_id && $partnerSeen && $partnerSeen->lt(now()->subSeconds(self::STALE_SECONDS))) {
+            if ($locked->user_two_id && $partnerSeen && $partnerSeen->lt(now()->subSeconds(self::CALL_STALE_SECONDS))) {
                 $locked->status = VideoMatch::ENDED;
                 $locked->end_reason = 'disconnect';
             }
@@ -468,11 +488,12 @@ class MatchController extends Controller
 
     private function expireAbandoned(): void
     {
-        $cutoff = now()->subSeconds(self::STALE_SECONDS);
+        $queueCutoff = now()->subSeconds(self::QUEUE_STALE_SECONDS);
+        $callCutoff = now()->subSeconds(self::CALL_STALE_SECONDS);
 
         VideoMatch::query()
             ->where('status', VideoMatch::WAITING)
-            ->where('user_one_seen_at', '<', $cutoff)
+            ->where('user_one_seen_at', '<', $queueCutoff)
             ->update([
                 'status' => VideoMatch::ENDED,
                 'end_reason' => 'disconnect',
@@ -481,8 +502,8 @@ class MatchController extends Controller
 
         VideoMatch::query()
             ->whereIn('status', [VideoMatch::CONNECTING, VideoMatch::CONNECTED])
-            ->where('user_one_seen_at', '<', $cutoff)
-            ->where('user_two_seen_at', '<', $cutoff)
+            ->where('user_one_seen_at', '<', $callCutoff)
+            ->where('user_two_seen_at', '<', $callCutoff)
             ->update([
                 'status' => VideoMatch::ENDED,
                 'end_reason' => 'disconnect',
@@ -545,6 +566,7 @@ class MatchController extends Controller
             'answer' => $role === 'offerer' ? ($signal['answer'] ?? null) : null,
             'candidates' => $outgoing,
             'cursor' => $maxId,
+            'v' => (int) ($signal['v'] ?? 0),
         ];
     }
 

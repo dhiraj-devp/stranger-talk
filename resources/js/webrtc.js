@@ -23,6 +23,11 @@ let cursor = 0;
 let pendingCandidates = [];
 let offerApplied = false;
 let answerApplied = false;
+let lastOfferSdp = '';
+let lastAnswerSdp = '';
+let peerRole = '';
+let remoteStream = null;
+let cursorHold = false;
 let stopped = false;
 let busy = false;
 let endingUi = false;
@@ -31,7 +36,14 @@ let misses = 0;
 let epoch = 0;
 let micOn = true;
 let camOn = true;
-let iceRestarted = false;
+let iceRestarts = 0;
+let restartingNow = false;
+let publishing = false;
+let signalVersion = 0;
+let holdLocalCandidates = false;
+let heldLocal = [];
+let pollInFlight = false;
+let pollAgain = false;
 let remoteSoundOn = false;
 let searchingAgain = false;
 let reverbSocket = null;
@@ -148,10 +160,6 @@ document.body.addEventListener('click', () => {
             audioTip.hidden = true;
         }).catch(() => {});
     }
-});
-
-window.addEventListener('pagehide', () => {
-    if (!ignoreUnload()) beacon(pageToken);
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -283,9 +291,13 @@ function schedulePoll() {
 }
 
 async function pollOnce() {
-    const ticket = epoch;
     if (stopped) return;
-
+    if (pollInFlight) {
+        pollAgain = true;
+        return;
+    }
+    pollInFlight = true;
+    const ticket = epoch;
     try {
         const data = await api('/match/poll?token=' + encodeURIComponent(pageToken) + '&cursor=' + cursor);
         if (ticket !== epoch || stopped) return;
@@ -296,19 +308,25 @@ async function pollOnce() {
         } catch (error) {
             if (ticket !== epoch) return;
             console.error(error);
-            failCall('The call could not be connected. Please try again.', true);
-            return;
         }
     } catch (error) {
         if (ticket !== epoch || stopped) return;
         misses += 1;
-        if (misses >= 5) {
+        if (misses >= 15) {
             onStrangerGone('poll-miss');
             return;
         }
+    } finally {
+        pollInFlight = false;
     }
 
-    if (ticket === epoch && !stopped) schedulePoll();
+    if (ticket !== epoch || stopped) return;
+    if (pollAgain) {
+        pollAgain = false;
+        pollOnce();
+        return;
+    }
+    schedulePoll();
 }
 
 async function applyState(data) {
@@ -337,9 +355,11 @@ async function applyState(data) {
 
     announce(data.status);
     paintPartner(data);
+    if (typeof data.v === 'number' && data.v > 0) signalVersion = data.v;
     if (data.status === 'connected') document.body.classList.remove('is-skipping');
 
-    if (data.status === 'connected' || (pc && pc.connectionState === 'connected')) {
+    const pictureIn = remoteVideo.videoWidth > 0;
+    if (data.status === 'connected' || (pc && pc.connectionState === 'connected') || pictureIn) {
         setStatus('Connected');
     } else {
         setStatus('Connecting...');
@@ -347,26 +367,54 @@ async function applyState(data) {
 
     await ensurePeer(data.role);
 
-    if (data.role === 'answerer' && data.offer && !offerApplied && pc) {
-        await pc.setRemoteDescription(normalizeDescription(data.offer));
-        offerApplied = true;
-        await flushPending();
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await api('/match/signal', {
-            method: 'POST',
-            body: JSON.stringify({
-                token: pageToken,
-                type: 'answer',
-                payload: normalizeDescription(pc.localDescription),
-            }),
-        });
+    let restarting = false;
+
+    if (data.role === 'answerer' && data.offer && pc) {
+        const nextSdp = data.offer.sdp || '';
+        if (!offerApplied || lastOfferSdp !== nextSdp) {
+            const replacing = offerApplied && lastOfferSdp !== nextSdp;
+            if (replacing) pendingCandidates = [];
+            try {
+                const description = normalizeDescription(data.offer);
+                if (pc.signalingState !== 'have-remote-offer') {
+                    await pc.setRemoteDescription(description);
+                }
+                await flushPending();
+                if (!pc.localDescription || pc.localDescription.type !== 'answer' || replacing) {
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                }
+                const answerPayload = normalizeDescription(pc.localDescription);
+                if (signalVersion > 0) answerPayload.v = signalVersion;
+                await api('/match/signal', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        token: pageToken,
+                        type: 'answer',
+                        payload: answerPayload,
+                    }),
+                });
+                lastOfferSdp = nextSdp;
+                offerApplied = true;
+                if (replacing) restarting = true;
+            } catch (error) {
+                console.error(error);
+            }
+        }
     }
 
-    if (data.role === 'offerer' && data.answer && !answerApplied && pc) {
-        await pc.setRemoteDescription(normalizeDescription(data.answer));
-        answerApplied = true;
-        await flushPending();
+    if (data.role === 'offerer' && data.answer && pc) {
+        const nextSdp = data.answer.sdp || '';
+        if (!answerApplied || lastAnswerSdp !== nextSdp) {
+            try {
+                await pc.setRemoteDescription(normalizeDescription(data.answer));
+                lastAnswerSdp = nextSdp;
+                answerApplied = true;
+                await flushPending();
+            } catch (error) {
+                console.error(error);
+            }
+        }
     }
 
     if (Array.isArray(data.candidates)) {
@@ -375,87 +423,53 @@ async function applyState(data) {
         }
     }
 
-    if (typeof data.cursor === 'number') cursor = data.cursor;
+    if (restarting || cursorHold) {
+        cursor = 0;
+        cursorHold = false;
+    } else if (typeof data.cursor === 'number') {
+        cursor = data.cursor;
+    }
 }
 
-async function ensurePeer(role) {
-    if (pc || !localStream) return;
+function postCandidate(candidate) {
+    api('/match/signal', {
+        method: 'POST',
+        body: JSON.stringify({
+            token: pageToken,
+            type: 'candidate',
+            payload: {
+                candidate: candidate.candidate,
+                sdpMid: candidate.sdpMid,
+                sdpMLineIndex: candidate.sdpMLineIndex,
+                usernameFragment: candidate.usernameFragment,
+                v: signalVersion,
+            },
+        }),
+    }).catch(() => {});
+}
 
-    pc = new RTCPeerConnection({ iceServers });
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+function queueOrSendCandidate(candidate) {
+    if (holdLocalCandidates || !signalVersion) {
+        heldLocal.push(candidate);
+        return;
+    }
+    postCandidate(candidate);
+}
 
-    pc.ontrack = (event) => {
-        let stream = remoteVideo.srcObject;
-        if (!(stream instanceof MediaStream)) {
-            stream = (event.streams && event.streams[0]) || new MediaStream();
-            remoteVideo.srcObject = stream;
-        }
-        if (event.track && !stream.getTracks().some((track) => track.id === event.track.id)) {
-            stream.addTrack(event.track);
-        }
-        if (!remoteSoundOn) {
-            remoteVideo.muted = true;
-            remoteVideo.setAttribute('muted', '');
-        }
-        remoteVideo.playsInline = true;
-        document.body.classList.add('has-remote');
-        remoteVideo.play().catch(() => {});
-        if (!remoteSoundOn) audioTip.hidden = false;
-    };
+async function flushLocalCandidates() {
+    const queued = heldLocal.splice(0, heldLocal.length);
+    for (const candidate of queued) postCandidate(candidate);
+}
 
-    pc.onicecandidate = (event) => {
-        if (!event.candidate) return;
-        api('/match/signal', {
-            method: 'POST',
-            body: JSON.stringify({
-                token: pageToken,
-                type: 'candidate',
-                payload: {
-                    candidate: event.candidate.candidate,
-                    sdpMid: event.candidate.sdpMid,
-                    sdpMLineIndex: event.candidate.sdpMLineIndex,
-                    usernameFragment: event.candidate.usernameFragment,
-                },
-            }),
-        }).catch(() => {});
-    };
-
-    pc.onconnectionstatechange = () => {
-        if (!pc) return;
-        if (pc.connectionState === 'connected') {
-            clearTimeout(disconnectTimer);
-            setStatus('Connected');
-            watchQuality();
-            api('/match/signal', {
-                method: 'POST',
-                body: JSON.stringify({ token: pageToken, type: 'connected', payload: {} }),
-            }).catch(() => {});
-        } else if (pc.connectionState === 'failed') {
-            api('/match/signal', {
-                method: 'POST',
-                body: JSON.stringify({ token: pageToken, type: 'failed', payload: {} }),
-            }).catch(() => {});
-            onStrangerGone('webrtc-failed');
-        } else if (pc.connectionState === 'disconnected') {
-            if (!iceRestarted && typeof pc.restartIce === 'function') {
-                iceRestarted = true;
-                setStatus('Connection problem');
-                paintQuality('Reconnecting', true);
-                try { pc.restartIce(); } catch (error) {}
-            }
-            clearTimeout(disconnectTimer);
-            disconnectTimer = setTimeout(() => {
-                if (pc && (pc.connectionState === 'disconnected' || pc.connectionState === 'failed')) {
-                    onStrangerGone('webrtc-disconnected');
-                }
-            }, 8000);
-        }
-    };
-
-    if (role === 'offerer') {
-        const offer = await pc.createOffer();
+async function publishOffer(extra) {
+    if (publishing || !pc) return;
+    publishing = true;
+    heldLocal = [];
+    holdLocalCandidates = true;
+    try {
+        const offer = await pc.createOffer(extra || {});
         await pc.setLocalDescription(offer);
-        await api('/match/signal', {
+        const saved = await api('/match/signal', {
             method: 'POST',
             body: JSON.stringify({
                 token: pageToken,
@@ -463,6 +477,96 @@ async function ensurePeer(role) {
                 payload: normalizeDescription(pc.localDescription),
             }),
         });
+        if (saved && saved.v) signalVersion = saved.v;
+    } finally {
+        holdLocalCandidates = false;
+        publishing = false;
+    }
+    await flushLocalCandidates();
+}
+
+async function restartOffer() {
+    if (!pc || peerRole !== 'offerer' || restartingNow || publishing || iceRestarts >= 3) return;
+    restartingNow = true;
+    cursorHold = true;
+    cursor = 0;
+    setStatus('Connection problem');
+    try {
+        await publishOffer({ iceRestart: true });
+        iceRestarts += 1;
+    } catch (error) {
+        holdLocalCandidates = false;
+        console.error(error);
+    } finally {
+        restartingNow = false;
+    }
+}
+
+function showRemoteTrack(track) {
+    if (!remoteStream) remoteStream = new MediaStream();
+    if (track && !remoteStream.getTracks().some((item) => item.id === track.id)) {
+        remoteStream.addTrack(track);
+    }
+    remoteVideo.srcObject = remoteStream;
+    if (!remoteSoundOn) {
+        remoteVideo.muted = true;
+        remoteVideo.setAttribute('muted', '');
+    }
+    remoteVideo.playsInline = true;
+    document.body.classList.add('has-remote');
+    const play = () => {
+        remoteVideo.play().catch(() => {});
+    };
+    play();
+    if (track) track.onunmute = play;
+    if (!remoteSoundOn) audioTip.hidden = false;
+}
+
+async function ensurePeer(role) {
+    if (role) peerRole = role;
+    if (pc || !localStream) return;
+
+    pc = new RTCPeerConnection({
+        iceServers: iceServers,
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require',
+        iceCandidatePoolSize: 4,
+    });
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+    pc.ontrack = (event) => {
+        showRemoteTrack(event.track);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+        if (pc && pc.iceConnectionState === 'failed') restartOffer().catch(() => {});
+    };
+
+    pc.onicecandidate = (event) => {
+        if (!event.candidate) return;
+        queueOrSendCandidate(event.candidate);
+    };
+
+    pc.onconnectionstatechange = () => {
+        if (!pc) return;
+        if (pc.connectionState === 'connected') {
+            clearTimeout(disconnectTimer);
+            iceRestarts = 0;
+            setStatus('Connected');
+            watchQuality();
+            api('/match/signal', {
+                method: 'POST',
+                body: JSON.stringify({ token: pageToken, type: 'connected', payload: {} }),
+            }).catch(() => {});
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            setStatus('Connection problem');
+            paintQuality('Reconnecting', true);
+            restartOffer().catch(() => {});
+        }
+    };
+
+    if (role === 'offerer') {
+        await publishOffer();
     }
 }
 
@@ -537,6 +641,7 @@ function closePeer() {
     connection.onicecandidate = null;
     connection.ontrack = null;
     connection.onconnectionstatechange = null;
+    connection.oniceconnectionstatechange = null;
     connection.close();
 }
 
@@ -547,6 +652,7 @@ function stopMedia() {
     localStream = null;
     localVideo.srcObject = null;
     remoteVideo.srcObject = null;
+    remoteStream = null;
     remoteSoundOn = false;
     document.body.classList.remove('has-remote');
 }
@@ -597,10 +703,18 @@ async function ensureMedia() {
 function resetPeerState() {
     offerApplied = false;
     answerApplied = false;
+    lastOfferSdp = '';
+    lastAnswerSdp = '';
     remoteSoundOn = false;
+    cursorHold = false;
+    iceRestarts = 0;
+    restartingNow = false;
+    publishing = false;
+    signalVersion = 0;
+    holdLocalCandidates = false;
+    heldLocal = [];
     pendingCandidates = [];
     cursor = 0;
-    iceRestarted = false;
     clearTimeout(disconnectTimer);
 }
 

@@ -134,12 +134,89 @@ class VideoChatTest extends TestCase
         [$a] = $this->pair();
 
         $match = VideoMatch::query()->first();
-        $match->user_two_seen_at = now()->subSeconds(30);
+        $match->user_two_seen_at = now()->subSeconds(60);
         $match->save();
 
         $this->actingAs($a)->getJson('/match/poll?token=token-a&cursor=0')
             ->assertJsonPath('status', 'ended')
             ->assertJsonPath('end_reason', 'disconnect');
+    }
+
+    public function test_a_short_blip_does_not_drop_the_call(): void
+    {
+        [$a] = $this->pair();
+
+        $match = VideoMatch::query()->first();
+        $match->user_two_seen_at = now()->subSeconds(20);
+        $match->save();
+
+        $this->actingAs($a)->getJson('/match/poll?token=token-a&cursor=0')
+            ->assertOk()
+            ->assertJsonPath('status', 'connecting');
+    }
+
+    public function test_a_new_offer_restarts_the_call_and_drops_the_old_answer(): void
+    {
+        [$a, $b] = $this->pair();
+
+        $this->actingAs($a)->postJson('/match/signal', [
+            'token' => 'token-a',
+            'type' => 'offer',
+            'payload' => ['type' => 'offer', 'sdp' => 'v=offer-1'],
+        ])->assertOk();
+        $this->actingAs($b)->postJson('/match/signal', [
+            'token' => 'token-b',
+            'type' => 'answer',
+            'payload' => ['type' => 'answer', 'sdp' => 'v=answer-1'],
+        ])->assertOk();
+        $this->actingAs($a)->postJson('/match/signal', [
+            'token' => 'token-a',
+            'type' => 'candidate',
+            'payload' => ['candidate' => 'candidate:old', 'sdpMid' => '0', 'sdpMLineIndex' => 0],
+        ])->assertOk();
+
+        $this->actingAs($a)->postJson('/match/signal', [
+            'token' => 'token-a',
+            'type' => 'offer',
+            'payload' => ['type' => 'offer', 'sdp' => 'v=offer-2'],
+        ])->assertOk();
+
+        $this->actingAs($b)->getJson('/match/poll?token=token-b&cursor=0')
+            ->assertOk()
+            ->assertJsonPath('offer.sdp', 'v=offer-2')
+            ->assertJsonPath('candidates', []);
+        $this->actingAs($a)->getJson('/match/poll?token=token-a&cursor=0')
+            ->assertOk()
+            ->assertJsonPath('answer', null)
+            ->assertJsonPath('v', 2);
+
+        $this->actingAs($b)->postJson('/match/signal', [
+            'token' => 'token-b',
+            'type' => 'answer',
+            'payload' => ['type' => 'answer', 'sdp' => 'v=answer-old', 'v' => 1],
+        ])->assertOk();
+        $this->actingAs($a)->getJson('/match/poll?token=token-a&cursor=0')
+            ->assertJsonPath('answer', null);
+
+        $this->actingAs($b)->postJson('/match/signal', [
+            'token' => 'token-b',
+            'type' => 'answer',
+            'payload' => ['type' => 'answer', 'sdp' => 'v=answer-2', 'v' => 2],
+        ])->assertOk();
+        $this->actingAs($b)->postJson('/match/signal', [
+            'token' => 'token-b',
+            'type' => 'candidate',
+            'payload' => ['candidate' => 'candidate:new', 'sdpMid' => '0', 'sdpMLineIndex' => 0, 'v' => 1],
+        ])->assertOk();
+        $this->actingAs($b)->postJson('/match/signal', [
+            'token' => 'token-b',
+            'type' => 'candidate',
+            'payload' => ['candidate' => 'candidate:new', 'sdpMid' => '0', 'sdpMLineIndex' => 0, 'v' => 2],
+        ])->assertOk();
+
+        $fresh = $this->actingAs($a)->getJson('/match/poll?token=token-a&cursor=0')->assertOk();
+        $fresh->assertJsonPath('answer.sdp', 'v=answer-2');
+        $this->assertSame(['candidate:new'], array_column($fresh->json('candidates'), 'candidate'));
     }
 
     public function test_remote_video_is_not_covered_once_the_picture_arrives(): void
@@ -153,6 +230,12 @@ class VideoChatTest extends TestCase
         $this->assertStringContainsString("document.body.classList.add('has-remote')", $script);
         $this->assertStringContainsString('remoteVideo.muted = true', $script);
         $this->assertStringContainsString("loadingText.textContent = 'Connecting...'", $script);
+        $this->assertStringContainsString('let remoteStream = null', $script);
+        $this->assertStringContainsString('iceRestart: true', $script);
+        $this->assertStringContainsString('track.onunmute = play', $script);
+        $this->assertStringContainsString('let pollInFlight = false', $script);
+        $this->assertStringContainsString('let signalVersion = 0', $script);
+        $this->assertStringNotContainsString("failCall('The call could not be connected. Please try again.', true)", $script);
     }
 
     public function test_turn_secret_is_hidden_until_turn_is_configured(): void
@@ -168,6 +251,7 @@ class VideoChatTest extends TestCase
         $this->actingAs($user)->get('/video')
             ->assertOk()
             ->assertSee('stun:stun.l.google.com:19302', false)
+            ->assertSee('stun:stun.cloudflare.com:3478', false)
             ->assertDontSee('turn-secret-value', false)
             ->assertSee('id="quality"', false)
             ->assertSee('id="cam-device"', false)
