@@ -467,8 +467,8 @@ async function ensurePeer(role) {
 }
 
 async function addCandidate(candidate) {
-    if (!candidate || !candidate.candidate || !pc) return;
-    if (!pc.remoteDescription) {
+    if (!candidate || !candidate.candidate) return;
+    if (!pc || !pc.remoteDescription) {
         pendingCandidates.push(candidate);
         return;
     }
