@@ -61,7 +61,7 @@ class TrackVisit
             return false;
         }
 
-        return ! $request->is('admin', 'admin/*', 'match/*', 'up', 'webrtc.js', 'analytics/*', 'sitemap.xml', 'robots.txt');
+        return ! $request->is('admin', 'admin/*', 'match/*', 'api/webrtc/*', 'up', 'webrtc.js', 'analytics/*', 'sitemap.xml', 'robots.txt');
     }
 
     private function path(Request $request): string

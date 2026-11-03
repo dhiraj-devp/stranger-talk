@@ -7,6 +7,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\IceServerController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\MatchController;
@@ -65,6 +66,9 @@ Route::middleware(['auth', 'active', 'profile'])->group(function () {
     Route::get('/blocks', [SafetyController::class, 'index'])->name('blocks');
     Route::delete('/blocks/{block}', [SafetyController::class, 'unblock'])->name('blocks.destroy');
     Route::get('/video', [VideoController::class, 'show'])->name('video');
+    Route::get('/api/webrtc/ice-servers', [IceServerController::class, 'show'])
+        ->middleware('throttle:30,1')
+        ->name('webrtc.ice-servers');
     Route::get('/webrtc.js', function () {
         return response()->file(resource_path('js/webrtc.js'), [
             'Content-Type' => 'application/javascript; charset=UTF-8',

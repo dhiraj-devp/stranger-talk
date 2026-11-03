@@ -1,5 +1,5 @@
 const csrf = document.querySelector('meta[name="csrf-token"]').content;
-const iceServers = JSON.parse(document.getElementById('ice-servers').textContent || '[]');
+let iceServerList = null;
 
 const remoteVideo = document.getElementById('remote');
 const localVideo = document.getElementById('local');
@@ -558,13 +558,33 @@ function showRemoteTrack(track) {
     if (!remoteSoundOn) audioTip.hidden = false;
 }
 
+async function loadIceServers() {
+    if (iceServerList) return iceServerList;
+    const data = await api('/api/webrtc/ice-servers');
+    const servers = data && data.iceServers;
+    if (!Array.isArray(servers) || servers.length === 0) {
+        throw new Error('Video relay did not return a server list.');
+    }
+    iceServerList = servers;
+    return iceServerList;
+}
+
 async function ensurePeer(role) {
     if (role) peerRole = role;
     if (pc || !localStream) return;
 
+    let servers;
+    try {
+        servers = await loadIceServers();
+    } catch (error) {
+        const message = error && error.message ? error.message : 'Video relay is unavailable. Try again in a moment.';
+        failCall(message, joined);
+        throw error;
+    }
+
     diagSerial += 1;
     pc = new RTCPeerConnection({
-        iceServers: iceServers,
+        iceServers: servers,
         bundlePolicy: 'max-bundle',
         rtcpMuxPolicy: 'require',
     });

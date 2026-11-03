@@ -5,8 +5,8 @@ namespace App\Support;
 class IceServers
 {
     /**
-     * ICE servers passed to RTCPeerConnection.
-     * TURN is included only when WEBRTC_TURN_URL is configured.
+     * STUN servers for the video page. TURN is not included.
+     * The call loads a fresh Cloudflare relay from /api/webrtc/ice-servers.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -34,32 +34,6 @@ class IceServers
         foreach ($configured as $url) {
             $servers[] = ['urls' => $url];
         }
-
-        $turnUrl = config('webrtc.turn.url');
-
-        if (! is_string($turnUrl) || trim($turnUrl) === '') {
-            return $servers;
-        }
-
-        $urls = array_values(array_filter(array_map('trim', explode(',', $turnUrl))));
-
-        if ($urls === []) {
-            return $servers;
-        }
-
-        $entry = ['urls' => count($urls) === 1 ? $urls[0] : $urls];
-        $username = config('webrtc.turn.username');
-        $credential = config('webrtc.turn.credential');
-
-        if (is_string($username) && $username !== '') {
-            $entry['username'] = $username;
-        }
-
-        if (is_string($credential) && $credential !== '') {
-            $entry['credential'] = $credential;
-        }
-
-        $servers[] = $entry;
 
         return $servers;
     }

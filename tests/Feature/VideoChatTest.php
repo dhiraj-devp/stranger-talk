@@ -236,6 +236,8 @@ class VideoChatTest extends TestCase
         $this->assertStringContainsString('let pollInFlight = false', $script);
         $this->assertStringContainsString('let signalVersion = 0', $script);
         $this->assertStringContainsString('function scheduleRestart()', $script);
+        $this->assertStringContainsString('function loadIceServers()', $script);
+        $this->assertStringContainsString("api('/api/webrtc/ice-servers')", $script);
         $this->assertStringContainsString('function exportDiagnostics()', $script);
         $this->assertStringContainsString("link.download = 'webrtc-diagnostics.json'", $script);
         $this->assertStringContainsString('pc.onicecandidateerror', $script);

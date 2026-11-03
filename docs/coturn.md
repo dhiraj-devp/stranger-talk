@@ -1,16 +1,21 @@
-# TURN / coturn
+# TURN
 
-TURN is not installed or configured by this project. Video chat uses STUN (`WEBRTC_STUN_URLS`) until you set a TURN server. Direct peer connections work on many networks without TURN. Symmetric NAT and strict firewalls need a relay.
+Direct peer connections work on many networks with STUN alone. Symmetric NAT and strict firewalls need a relay. The video call asks `GET /api/webrtc/ice-servers` for a short-lived Cloudflare TURN credential. The API token stays on the server.
 
-Do not put real credentials in git. Set them only in the server `.env`:
+In the Cloudflare dashboard, open **Realtime → TURN**, create a TURN key, and create an API token that can use that key. Put only these placeholders' real values in the server `.env`. Do not commit them:
 
 ```
-WEBRTC_TURN_URL=turn:turn.example.com:3478?transport=udp
-WEBRTC_TURN_USERNAME=
-WEBRTC_TURN_CREDENTIAL=
+CLOUDFLARE_TURN_KEY_ID=
+CLOUDFLARE_TURN_API_TOKEN=
 ```
 
-You can add more STUN or TURN URLs as a comma-separated `WEBRTC_STUN_URLS` list. The TURN URL is included only when `WEBRTC_TURN_URL` is not empty. The credential is not sent to the browser unless that URL is set.
+Restart PHP after changing `.env`. Each signed-in video session requests credentials with a 24-hour lifetime. The browser receives the temporary username, password, and relay URLs. It never receives the API token.
+
+`WEBRTC_STUN_URLS` is still the STUN list on the video page. Static `WEBRTC_TURN_URL`, `WEBRTC_TURN_USERNAME`, and `WEBRTC_TURN_CREDENTIAL` are not used.
+
+## Self-hosted coturn
+
+coturn below is not wired to the video page. The live relay is Cloudflare.
 
 ## Install (Ubuntu)
 
@@ -63,12 +68,4 @@ sudo ufw allow 49152:65535/udp
 
 ## Time-limited credentials
 
-coturn `use-auth-secret` expects a username of `expiry:user` and a credential of `base64(hmac-sha1(secret, username))`. This application currently sends the static `WEBRTC_TURN_USERNAME` and `WEBRTC_TURN_CREDENTIAL` from the environment. If you use a long-term coturn user instead of the REST secret, create it with:
-
-```bash
-sudo turnadmin -a -u turnuser -p 'REPLACE_WITH_A_PASSWORD' -r talk.dvmsoft.in
-```
-
-Then set those values in `.env`. Rotate them if they leak. Logs should stay on the server (`syslog`) and must not be copied into the Laravel log with the secret.
-
-Until `WEBRTC_TURN_URL` is set on the server, TURN is not live.
+coturn `use-auth-secret` expects a username of `expiry:user` and a credential of `base64(hmac-sha1(secret, username))`. This application does not send coturn credentials. Video relay credentials come from Cloudflare, as described above. Logs must not include the Cloudflare API token or the generated username and password.
