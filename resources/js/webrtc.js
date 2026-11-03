@@ -39,6 +39,12 @@ let camOn = true;
 let iceRestarts = 0;
 let restartingNow = false;
 let publishing = false;
+let failureTimer = null;
+let mediaReadySent = false;
+let diagSerial = 0;
+const iceErrors = [];
+const localCandidateLog = [];
+const remoteCandidateLog = [];
 let signalVersion = 0;
 let holdLocalCandidates = false;
 let heldLocal = [];
@@ -432,18 +438,19 @@ async function applyState(data) {
 }
 
 function postCandidate(candidate) {
+    const payload = {
+        candidate: candidate.candidate,
+        sdpMid: candidate.sdpMid,
+        sdpMLineIndex: candidate.sdpMLineIndex,
+        usernameFragment: candidate.usernameFragment,
+    };
+    if (signalVersion > 0) payload.v = signalVersion;
     api('/match/signal', {
         method: 'POST',
         body: JSON.stringify({
             token: pageToken,
             type: 'candidate',
-            payload: {
-                candidate: candidate.candidate,
-                sdpMid: candidate.sdpMid,
-                sdpMLineIndex: candidate.sdpMLineIndex,
-                usernameFragment: candidate.usernameFragment,
-                v: signalVersion,
-            },
+            payload: payload,
         }),
     }).catch(() => {});
 }
@@ -464,9 +471,13 @@ async function flushLocalCandidates() {
 async function publishOffer(extra) {
     if (publishing || !pc) return;
     publishing = true;
-    heldLocal = [];
+    const restarting = !!(extra && extra.iceRestart);
+    if (restarting) heldLocal = [];
     holdLocalCandidates = true;
     try {
+        if (restarting && (pc.signalingState === 'have-local-offer' || pc.signalingState === 'have-remote-offer')) {
+            try { await pc.setLocalDescription({ type: 'rollback' }); } catch (error) {}
+        }
         const offer = await pc.createOffer(extra || {});
         await pc.setLocalDescription(offer);
         const saved = await api('/match/signal', {
@@ -485,12 +496,22 @@ async function publishOffer(extra) {
     await flushLocalCandidates();
 }
 
+function scheduleRestart() {
+    if (failureTimer || iceRestarts >= 1) return;
+    failureTimer = setTimeout(() => {
+        failureTimer = null;
+        if (!pc) return;
+        if (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') return;
+        if (pc.iceConnectionState !== 'failed' && pc.connectionState !== 'failed') return;
+        restartOffer().catch(() => {});
+    }, 12000);
+}
+
 async function restartOffer() {
-    if (!pc || peerRole !== 'offerer' || restartingNow || publishing || iceRestarts >= 3) return;
+    if (!pc || peerRole !== 'offerer' || restartingNow || publishing || iceRestarts >= 1) return;
     restartingNow = true;
     cursorHold = true;
     cursor = 0;
-    setStatus('Connection problem');
     try {
         await publishOffer({ iceRestart: true });
         iceRestarts += 1;
@@ -500,6 +521,21 @@ async function restartOffer() {
     } finally {
         restartingNow = false;
     }
+}
+
+function markConnected() {
+    clearTimeout(failureTimer);
+    failureTimer = null;
+    iceRestarts = 0;
+    setStatus('Connected');
+    remoteVideo.play().catch(() => {});
+    watchQuality();
+    if (mediaReadySent) return;
+    mediaReadySent = true;
+    api('/match/signal', {
+        method: 'POST',
+        body: JSON.stringify({ token: pageToken, type: 'connected', payload: {} }),
+    }).catch(() => {});
 }
 
 function showRemoteTrack(track) {
@@ -526,12 +562,20 @@ async function ensurePeer(role) {
     if (role) peerRole = role;
     if (pc || !localStream) return;
 
+    diagSerial += 1;
     pc = new RTCPeerConnection({
         iceServers: iceServers,
         bundlePolicy: 'max-bundle',
         rtcpMuxPolicy: 'require',
-        iceCandidatePoolSize: 4,
     });
+    pc.onicecandidate = (event) => {
+        if (!event.candidate) return;
+        rememberLocalCandidate(event.candidate);
+        queueOrSendCandidate(event.candidate);
+    };
+    pc.onicecandidateerror = (event) => {
+        rememberIceError(event);
+    };
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
     pc.ontrack = (event) => {
@@ -539,29 +583,24 @@ async function ensurePeer(role) {
     };
 
     pc.oniceconnectionstatechange = () => {
-        if (pc && pc.iceConnectionState === 'failed') restartOffer().catch(() => {});
-    };
-
-    pc.onicecandidate = (event) => {
-        if (!event.candidate) return;
-        queueOrSendCandidate(event.candidate);
+        if (!pc) return;
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+            clearTimeout(failureTimer);
+            failureTimer = null;
+            remoteVideo.play().catch(() => {});
+            if (pc.connectionState === 'connected') markConnected();
+            return;
+        }
+        if (pc.iceConnectionState === 'failed') scheduleRestart();
     };
 
     pc.onconnectionstatechange = () => {
         if (!pc) return;
         if (pc.connectionState === 'connected') {
             clearTimeout(disconnectTimer);
-            iceRestarts = 0;
-            setStatus('Connected');
-            watchQuality();
-            api('/match/signal', {
-                method: 'POST',
-                body: JSON.stringify({ token: pageToken, type: 'connected', payload: {} }),
-            }).catch(() => {});
-        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            setStatus('Connection problem');
-            paintQuality('Reconnecting', true);
-            restartOffer().catch(() => {});
+            markConnected();
+        } else if (pc.connectionState === 'failed') {
+            scheduleRestart();
         }
     };
 
@@ -572,6 +611,7 @@ async function ensurePeer(role) {
 
 async function addCandidate(candidate) {
     if (!candidate || !candidate.candidate) return;
+    rememberRemoteCandidate(candidate);
     if (!pc || !pc.remoteDescription) {
         pendingCandidates.push(candidate);
         return;
@@ -635,10 +675,13 @@ function failCall(message, notify) {
 
 function closePeer() {
     clearInterval(qualityTimer);
+    clearTimeout(failureTimer);
+    failureTimer = null;
     if (!pc) return;
     const connection = pc;
     pc = null;
     connection.onicecandidate = null;
+    connection.onicecandidateerror = null;
     connection.ontrack = null;
     connection.onconnectionstatechange = null;
     connection.oniceconnectionstatechange = null;
@@ -710,6 +753,9 @@ function resetPeerState() {
     iceRestarts = 0;
     restartingNow = false;
     publishing = false;
+    mediaReadySent = false;
+    clearTimeout(failureTimer);
+    failureTimer = null;
     signalVersion = 0;
     holdLocalCandidates = false;
     heldLocal = [];
@@ -776,8 +822,8 @@ function watchQuality() {
 }
 
 async function sampleQuality() {
-    if (!pc || pc.connectionState === 'disconnected') {
-        paintQuality('Reconnecting', true);
+    if (!pc || pc.connectionState !== 'connected') {
+        if (mediaReadySent) paintQuality('Reconnecting', true);
         return;
     }
     if (pc.connectionState !== 'connected') return;
@@ -915,6 +961,199 @@ async function subscribeSignal() {
     if (!response.ok) return;
     const auth = await response.json();
     reverbSocket.send(JSON.stringify({ event: 'pusher:subscribe', data: { channel, auth: auth.auth } }));
+}
+
+function rememberLocalCandidate(candidate) {
+    pushDiag(localCandidateLog, {
+        at: new Date().toISOString(),
+        connection: diagSerial,
+        candidate: candidate.candidate,
+        sdpMid: candidate.sdpMid ?? null,
+        sdpMLineIndex: candidate.sdpMLineIndex ?? null,
+    });
+}
+
+function rememberRemoteCandidate(candidate) {
+    pushDiag(remoteCandidateLog, {
+        at: new Date().toISOString(),
+        connection: diagSerial,
+        candidate: candidate.candidate,
+        sdpMid: candidate.sdpMid ?? null,
+        sdpMLineIndex: candidate.sdpMLineIndex ?? null,
+    });
+}
+
+function rememberIceError(event) {
+    pushDiag(iceErrors, {
+        at: new Date().toISOString(),
+        connection: diagSerial,
+        errorCode: event && event.errorCode != null ? event.errorCode : null,
+        errorText: (event && (event.errorText || event.message)) || '',
+        url: (event && event.url) || '',
+        address: (event && event.address) || '',
+        port: event && event.port != null ? event.port : null,
+    });
+}
+
+function pushDiag(list, entry) {
+    list.push(entry);
+    if (list.length > 500) list.shift();
+}
+
+function plainStat(stat) {
+    const recordedAt = new Date().toISOString();
+    try {
+        const copy = JSON.parse(JSON.stringify(stat, function (key, value) {
+            return typeof value === 'bigint' ? value.toString() : value;
+        }));
+        copy.recordedAt = recordedAt;
+        return copy;
+    } catch (error) {
+        return {
+            recordedAt: recordedAt,
+            id: stat && stat.id ? stat.id : '',
+            type: stat && stat.type ? stat.type : '',
+            error: 'This stat could not be copied.',
+        };
+    }
+}
+
+async function readStats(connection) {
+    const report = await connection.getStats();
+    const rows = [];
+    report.forEach(function (stat) {
+        rows.push(plainStat(stat));
+    });
+    return rows;
+}
+
+function selectedPair(stats) {
+    const byId = new Map(stats.map(function (stat) { return [stat.id, stat]; }));
+    let pair = stats.find(function (stat) {
+        return stat.type === 'candidate-pair' && (stat.selected || stat.nominated) && stat.state === 'succeeded';
+    });
+    if (!pair) {
+        const transport = stats.find(function (stat) {
+            return stat.type === 'transport' && stat.selectedCandidatePairId;
+        });
+        if (transport) pair = byId.get(transport.selectedCandidatePairId) || null;
+    }
+    if (!pair) return null;
+    return {
+        at: pair.recordedAt,
+        pair: pair,
+        localCandidate: byId.get(pair.localCandidateId) || null,
+        remoteCandidate: byId.get(pair.remoteCandidateId) || null,
+    };
+}
+
+function rtpByKind(stats, type) {
+    const rows = stats.filter(function (stat) {
+        return stat.type === type && (stat.kind === 'audio' || stat.kind === 'video' || stat.mediaType === 'audio' || stat.mediaType === 'video');
+    });
+    return {
+        audio: rows.filter(function (stat) { return stat.kind === 'audio' || stat.mediaType === 'audio'; }),
+        video: rows.filter(function (stat) { return stat.kind === 'video' || stat.mediaType === 'video'; }),
+    };
+}
+
+function loggedCandidates(list, serial) {
+    return list.filter(function (item) { return item.connection === serial; });
+}
+
+async function describeConnection(connection) {
+    const at = new Date().toISOString();
+    const snapshot = {
+        at: at,
+        iceConnectionState: connection.iceConnectionState,
+        connectionState: connection.connectionState,
+        signalingState: connection.signalingState,
+        iceGatheringState: connection.iceGatheringState,
+        localCandidates: loggedCandidates(localCandidateLog, diagSerial),
+        remoteCandidates: loggedCandidates(remoteCandidateLog, diagSerial),
+        selectedCandidatePair: null,
+        inbound: { audio: [], video: [] },
+        outbound: { audio: [], video: [] },
+        iceErrors: loggedCandidates(iceErrors, diagSerial),
+        stats: [],
+        error: null,
+    };
+    try {
+        const stats = await readStats(connection);
+        snapshot.stats = stats;
+        const localFromStats = stats.filter(function (stat) { return stat.type === 'local-candidate'; });
+        const remoteFromStats = stats.filter(function (stat) { return stat.type === 'remote-candidate'; });
+        if (localFromStats.length) snapshot.localCandidates = localFromStats;
+        if (remoteFromStats.length) snapshot.remoteCandidates = remoteFromStats;
+        snapshot.selectedCandidatePair = selectedPair(stats);
+        snapshot.inbound = rtpByKind(stats, 'inbound-rtp');
+        snapshot.outbound = rtpByKind(stats, 'outbound-rtp');
+    } catch (error) {
+        snapshot.error = error && error.message ? error.message : 'Peer statistics could not be read.';
+    }
+    return snapshot;
+}
+
+function downloadDiagnostics(data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'webrtc-diagnostics.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+}
+
+async function exportDiagnostics() {
+    const exportedAt = new Date().toISOString();
+    const button = document.getElementById('export-diagnostics');
+    try {
+        const active = pc ? [pc] : [];
+        if (!active.length) {
+            downloadDiagnostics({
+                exportedAt: exportedAt,
+                connections: [],
+                iceErrors: iceErrors.slice(),
+                error: 'No active peer connection. Start a call, then export again.',
+            });
+            return;
+        }
+        const connections = [];
+        for (const connection of active) {
+            connections.push(await describeConnection(connection));
+        }
+        downloadDiagnostics({
+            exportedAt: exportedAt,
+            connections: connections,
+            iceErrors: iceErrors.slice(),
+            error: null,
+        });
+    } catch (error) {
+        const message = error && error.message ? error.message : 'Diagnostics could not be collected.';
+        try {
+            downloadDiagnostics({
+                exportedAt: exportedAt,
+                connections: [],
+                iceErrors: iceErrors.slice(),
+                error: message,
+            });
+        } catch (downloadError) {
+            if (button) button.textContent = 'Could not export diagnostics';
+        }
+    }
+}
+
+window.exportWebRtcDiagnostics = exportDiagnostics;
+
+const exportDiagnosticsBtn = document.getElementById('export-diagnostics');
+if (exportDiagnosticsBtn) {
+    exportDiagnosticsBtn.addEventListener('click', function () {
+        exportDiagnostics().catch(function () {
+            exportDiagnosticsBtn.textContent = 'Could not export diagnostics';
+        });
+    });
 }
 
 function newToken() {

@@ -235,6 +235,11 @@ class VideoChatTest extends TestCase
         $this->assertStringContainsString('track.onunmute = play', $script);
         $this->assertStringContainsString('let pollInFlight = false', $script);
         $this->assertStringContainsString('let signalVersion = 0', $script);
+        $this->assertStringContainsString('function scheduleRestart()', $script);
+        $this->assertStringContainsString('function exportDiagnostics()', $script);
+        $this->assertStringContainsString("link.download = 'webrtc-diagnostics.json'", $script);
+        $this->assertStringContainsString('pc.onicecandidateerror', $script);
+        $this->assertStringNotContainsString("pc.connectionState === 'failed' || pc.connectionState === 'disconnected'", $script);
         $this->assertStringNotContainsString("failCall('The call could not be connected. Please try again.', true)", $script);
     }
 
@@ -254,6 +259,8 @@ class VideoChatTest extends TestCase
             ->assertSee('stun:stun.cloudflare.com:3478', false)
             ->assertDontSee('turn-secret-value', false)
             ->assertSee('id="quality"', false)
+            ->assertSee('id="export-diagnostics"', false)
+            ->assertSee('Export WebRTC Diagnostics', false)
             ->assertSee('id="cam-device"', false)
             ->assertSee('id="remote"', false)
             ->assertSee('room-state.js', false)

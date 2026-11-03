@@ -55,6 +55,7 @@
                 <select id="spk-device" hidden></select>
                 <button id="report" type="button">Report</button>
                 <button id="block" type="button">Block</button>
+                <button id="export-diagnostics" type="button">Export WebRTC Diagnostics</button>
                 <a href="{{ route('guidelines') }}">Community Guidelines</a>
                 <a href="{{ route('profile.edit') }}">Profile</a>
                 <form method="POST" action="{{ route('logout') }}">
