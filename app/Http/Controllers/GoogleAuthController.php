@@ -20,6 +20,8 @@ class GoogleAuthController extends Controller
             ]);
         }
 
+        app(AnalyticsRecorder::class)->track(null, 'signup_started', ['path' => '/auth/google']);
+
         return Socialite::driver('google')->scopes(['openid', 'profile', 'email'])->redirect();
     }
 

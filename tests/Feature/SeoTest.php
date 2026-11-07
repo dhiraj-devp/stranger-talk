@@ -16,6 +16,8 @@ class SeoTest extends TestCase
     {
         $this->get('/')->assertOk()
             ->assertSee('Start Video Chat')
+            ->assertSee('Random Video Chat in India – Meet New People Online')
+            ->assertSee('does not currently guarantee a match by gender')
             ->assertSee('<h1>', false)
             ->assertSee('rel="canonical"', false)
             ->assertSee('name="description"', false)
@@ -26,7 +28,7 @@ class SeoTest extends TestCase
 
         $this->get('/privacy')->assertOk()->assertSee('index,follow', false)->assertSee('<h1>Privacy</h1>', false);
         $this->get('/terms')->assertOk()->assertSee('<h1>Terms</h1>', false);
-        $this->get('/about')->assertOk()->assertSee('<h1>About Koko Meet</h1>', false);
+        $this->get('/about')->assertOk()->assertSee('<h1>About Koko Meet — One-to-One Random Video Chat in India</h1>', false);
         $this->get('/contact')->assertOk();
         $this->get('/safety')->assertOk();
         $this->get('/blog')->assertOk()->assertSee('How random video chat works');
@@ -34,11 +36,15 @@ class SeoTest extends TestCase
         $this->get('/guides')->assertOk();
         $this->get('/guides/random-video-chat')->assertRedirect('/guides/what-to-expect')->assertStatus(301);
         $this->get('/guides/what-to-expect')->assertOk()->assertSee('Article', false);
-        $this->get('/random-video-chat')->assertOk()->assertSee('<h1>Random video chat</h1>', false)->assertSee('index,follow', false)->assertSee('href="/safety"', false);
-        $this->get('/talk-to-strangers')->assertOk()->assertSee('<h1>Talk to strangers online</h1>', false)->assertSee('index,follow', false);
-        $this->get('/omegle-alternative')->assertOk()->assertSee('<h1>An Omegle alternative for one-to-one chat</h1>', false)->assertSee('index,follow', false);
-        $this->get('/features')->assertOk()->assertSee('<h1>Koko Meet features</h1>', false)->assertSee('index,follow', false);
-        $this->get('/help')->assertOk()->assertSee('<h1>Help with camera and connection problems</h1>', false)->assertSee('index,follow', false);
+        $this->get('/random-video-chat')->assertOk()->assertSee('<h1>Random Video Chat Online in India</h1>', false)->assertSee('index,follow', false)->assertSee('href="/safety"', false);
+        $this->get('/random-video-chat-india')->assertOk()->assertSee('does not currently guarantee state-', false);
+        $this->get('/talk-to-girls-online')->assertOk()->assertSee('no guarantee that a match will be female', false);
+        $this->get('/talk-to-strangers')->assertOk()->assertSee('<h1>Talk to Strangers Online Through Video Chat</h1>', false)->assertSee('index,follow', false);
+        $this->get('/omegle-alternative')->assertOk()->assertSee('<h1>Looking for an Omegle Alternative in India?</h1>', false)->assertSee('index,follow', false);
+        $this->get('/features')->assertOk()->assertSee('<h1>Koko Meet Features — Random Video and Text Chat</h1>', false)->assertSee('index,follow', false);
+        $this->get('/help')->assertOk()->assertSee('<h1>Help with Camera and Microphone Problems</h1>', false)->assertSee('index,follow', false);
+        $this->get('/conversation-starters')->assertOk()->assertSee('Show another question');
+        $this->get('/random-question-generator')->assertOk()->assertSee('Next question');
         $this->get('/community-guidelines')->assertRedirect('/guidelines')->assertStatus(301);
         $this->get('/login')->assertOk()->assertSee('noindex,nofollow', false)->assertSee('Continue with Google');
 
@@ -51,10 +57,13 @@ class SeoTest extends TestCase
             ->assertSee(url('/contact'), false)
             ->assertSee(url('/random-video-chat'), false)
             ->assertSee(url('/omegle-alternative'), false)
-            ->assertDontSee(url('/admin'), false)
-            ->assertDontSee(url('/login'), false)
-            ->assertDontSee(url('/video'), false)
-            ->assertDontSee(url('/home'), false)
+            ->assertSee(url('/random-video-chat-india'), false)
+            ->assertSee(url('/conversation-starters'), false)
+            ->assertDontSee(url('/blog/what-is-random-video-chat'), false)
+            ->assertDontSee(url('/admin').'</loc>', false)
+            ->assertDontSee(url('/login').'</loc>', false)
+            ->assertDontSee(url('/video').'</loc>', false)
+            ->assertDontSee(url('/home').'</loc>', false)
             ->assertDontSee(url('/health'), false);
 
         $this->get('/robots.txt')->assertOk()
@@ -64,6 +73,8 @@ class SeoTest extends TestCase
             ->assertSee('Sitemap:');
 
         $this->get('/site.webmanifest')->assertOk()->assertJsonPath('name', 'Koko Meet');
+        $this->get('/login');
+        $this->assertSame(0, \App\Models\PageView::query()->whereIn('path', ['/site.webmanifest', '/login'])->count());
 
         $settings = \App\Models\SiteSetting::query()->first();
         $settings->forceFill(['logo' => 'seo/logo.png', 'favicon' => 'seo/icon.png'])->save();

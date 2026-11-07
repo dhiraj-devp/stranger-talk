@@ -16,6 +16,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SafetyController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\ToolController;
 use App\Http\Controllers\VideoController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +40,10 @@ Route::get('/blog', [ContentController::class, 'blog'])->name('blog');
 Route::get('/guides', [ContentController::class, 'guides'])->name('guides');
 Route::get('/blog/{slug}', [ContentController::class, 'post'])->where('slug', '[a-z0-9\-]+')->name('blog.show');
 Route::get('/guides/{slug}', [ContentController::class, 'guide'])->where('slug', '[a-z0-9\-]+')->name('guides.show');
+Route::get('/conversation-starters', [ToolController::class, 'starters'])->name('tools.starters');
+Route::get('/random-question-generator', [ToolController::class, 'questions'])->name('tools.questions');
+Route::get('/would-you-rather', [ToolController::class, 'rather'])->name('tools.rather');
+Route::get('/random-topic-generator', [ToolController::class, 'topics'])->name('tools.topics');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');

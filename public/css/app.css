@@ -198,7 +198,7 @@ button.secondary, .secondary { background: transparent; border-color: var(--line
 .proof p + p { border-left: 1px solid var(--line); }
 
 .section, .final { width: min(1240px, calc(100% - 48px)); margin: 0 auto; padding: 72px 0; }
-.steps { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 28px 0 0; padding: 0; }
+.steps { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 28px 0 0; padding: 0; }
 .steps li { display: grid; gap: 10px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px; transition: transform 180ms ease, border-color 180ms ease; }
 .steps li:hover { transform: translateY(-3px); border-color: rgba(120, 101, 255, 0.45); }
 .steps span { color: var(--violet-2); font-weight: 750; }
@@ -322,6 +322,12 @@ fieldset { border: 0; margin: 0; padding: 0; }
 h2 { font-size: 1.35rem; }
 .legal p, .legal li { color: var(--muted); }
 .doc { width: min(760px, calc(100% - 40px)); margin: 28px auto 48px; }
+.tool-box { display: grid; gap: 12px; margin: 18px 0 28px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.tool-box p { font-size: 1.15rem; margin: 0; }
+.tool-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.tool-box select { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: inherit; padding: 0 10px; }
+.prompt-list { padding-left: 1.1rem; }
+.prompt-list li { margin: 0.4rem 0; }
 .doc h1 { font-size: 2rem; letter-spacing: -0.03em; }
 .doc h2 { margin-top: 1.4em; }
 .doc img { max-width: 100%; height: auto; border-radius: 12px; }

@@ -35,6 +35,7 @@ class MatchController extends Controller
         $match = $this->enqueue($request->user(), $token);
         app(AnalyticsRecorder::class)->track($request->user(), 'find_stranger');
         app(AnalyticsRecorder::class)->track($request->user(), 'search_started');
+        app(AnalyticsRecorder::class)->track($request->user(), 'match_search_started');
         if ($match->status === VideoMatch::WAITING) {
             app(AnalyticsRecorder::class)->track($request->user(), 'search_wait');
         }
@@ -386,6 +387,7 @@ class MatchController extends Controller
         MatchEvent::write($match->id, $actor->id, MatchEvent::CREATED);
         app(PresenceService::class)->touch($actor->id, 'in_call');
         app(AnalyticsRecorder::class)->track($actor, 'match_created');
+        app(AnalyticsRecorder::class)->track($actor, 'match_found');
         $this->broadcast($match);
     }
 
@@ -461,6 +463,9 @@ class MatchController extends Controller
             };
             MatchEvent::write($locked->id, $user->id, $type);
             app(AnalyticsRecorder::class)->track($user, $reason === 'next' ? 'next' : 'call_ended');
+            if ($reason === 'next') {
+                app(AnalyticsRecorder::class)->track($user, 'next_clicked');
+            }
             $seconds = $locked->created_at ? (int) $locked->created_at->diffInSeconds($locked->ended_at) : 0;
             app(AnalyticsRecorder::class)->track($user, 'call_duration', ['seconds' => $seconds]);
         });

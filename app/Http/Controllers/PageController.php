@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AnalyticsRecorder;
 use App\Services\SeoBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -17,6 +18,8 @@ class PageController extends Controller
 
             return redirect()->route($user->profileComplete() ? 'home' : 'profile.setup');
         }
+
+        app(AnalyticsRecorder::class)->track(null, 'landing_page_view', ['path' => '/']);
 
         return view('landing', ['seo' => $this->seo->home()]);
     }

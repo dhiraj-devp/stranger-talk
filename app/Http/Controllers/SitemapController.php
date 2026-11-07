@@ -18,6 +18,10 @@ class SitemapController extends Controller
             [$site->absolute('/guidelines'), $this->mtime(resource_path('views/legal/guidelines.blade.php'))],
             [$site->absolute('/blog'), null],
             [$site->absolute('/guides'), null],
+            [$site->absolute('/conversation-starters'), null],
+            [$site->absolute('/random-question-generator'), null],
+            [$site->absolute('/would-you-rather'), null],
+            [$site->absolute('/random-topic-generator'), null],
         ];
 
         try {

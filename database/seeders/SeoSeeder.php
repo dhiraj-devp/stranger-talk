@@ -145,16 +145,17 @@ TXT, $start->id, true);
 
     public function syncGrowth(): void
     {
-        $oldTitle = 'Koko Meet — random video chat with strangers';
-        $oldDescription = 'Koko Meet pairs you with one person for a live video conversation. Sign in with Google, get matched at random, and talk one-to-one.';
         $defaults = SiteSetting::defaults();
-        SiteSetting::query()
-            ->where('default_title', $oldTitle)
-            ->where('default_description', $oldDescription)
-            ->update([
-                'default_title' => $defaults['default_title'],
-                'default_description' => $defaults['default_description'],
-            ]);
+        SiteSetting::query()->whereIn('default_title', [
+            'Koko Meet — random video chat with strangers',
+            'Koko Meet — Random Video Chat with Strangers',
+        ])->update(['default_title' => $defaults['default_title']]);
+        SiteSetting::query()->whereIn('default_description', [
+            'Koko Meet pairs you with one person for a live video conversation. Sign in with Google, get matched at random, and talk one-to-one.',
+            'Koko Meet is a one-to-one random video chat with text in the call. Read the privacy and safety notes, then sign in to start.',
+        ])->update(['default_description' => $defaults['default_description']]);
+        SiteSetting::query()->where('organization_description', 'Koko Meet is a random video chat for one-to-one conversations.')
+            ->update(['organization_description' => $defaults['organization_description']]);
         SiteSetting::forgetCache();
 
         $guide = Content::query()->where('type', 'guide')->where('slug', 'random-video-chat')->first();

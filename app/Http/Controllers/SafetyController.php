@@ -31,6 +31,7 @@ class SafetyController extends Controller
 
         $safety->report($request->user(), $partner, $match->id, $data['reason'], $data['description'] ?? null);
         app(AnalyticsRecorder::class)->track($request->user(), 'report');
+        app(AnalyticsRecorder::class)->track($request->user(), 'report_submitted');
 
         return response()->json(['ok' => true]);
     }
@@ -54,6 +55,7 @@ class SafetyController extends Controller
             }
         });
         app(AnalyticsRecorder::class)->track($request->user(), 'block');
+        app(AnalyticsRecorder::class)->track($request->user(), 'block_submitted');
 
         return response()->json(['ok' => true, 'status' => 'ended']);
     }

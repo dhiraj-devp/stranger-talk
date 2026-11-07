@@ -42,7 +42,7 @@ class SeoBuilder
         return $this->meta($site, $title, $description, $canonical, 'index,follow', $image, $graph, [['Home', null]]);
     }
 
-    public function page(string $title, string $description, string $path): SeoMeta
+    public function page(string $title, string $description, string $path, ?string $documentTitle = null): SeoMeta
     {
         $site = SiteSetting::current();
         $canonical = $site->absolute($path);
@@ -50,14 +50,15 @@ class SeoBuilder
         $graph = [
             [
                 '@type' => 'WebPage',
-                'name' => $title,
+                'name' => $documentTitle ?: $title,
                 'url' => $canonical,
                 'description' => $description,
             ],
             $this->breadcrumbs($site, $crumbs),
         ];
+        $fullTitle = $documentTitle ?: $title.' — '.$site->site_name;
 
-        return $this->meta($site, $title.' — '.$site->site_name, $description, $canonical, 'index,follow', $site->assetAbsolute($site->og_image), $graph, $crumbs);
+        return $this->meta($site, $fullTitle, $description, $canonical, 'index,follow', $site->assetAbsolute($site->og_image), $graph, $crumbs);
     }
 
     public function content(Content $content, ?string $prev = null, ?string $next = null): SeoMeta
@@ -117,18 +118,27 @@ class SeoBuilder
 
     public static function faqs(string $site): array
     {
+        $matching = config('features.preference_matching')
+            ? 'Matching uses the gender and country preferences both people saved. Anyone and any country still match freely.'
+            : 'Matching is random and subject to availability and safety restrictions. Saved gender and country preferences do not currently affect matching.';
+
         return [
-            ['q' => 'What is '.$site.'?', 'a' => $site.' is a random one-to-one video chat. You are paired with one other person for a live conversation.'],
-            ['q' => 'How do I start a conversation?', 'a' => 'Sign in with Google, confirm your profile, then start a search.'],
-            ['q' => 'How does matching work?', 'a' => config('features.preference_matching')
-                ? 'You are paired with one other person who is also looking and who fits the gender and country preferences you both saved.'
-                : 'You are paired at random with one other person who is also looking. Gender and country are not used to filter matches.'],
-            ['q' => 'Can I skip someone?', 'a' => 'Yes. Next ends the current call and looks for someone else.'],
-            ['q' => 'Does '.$site.' record my calls?', 'a' => 'No. Video and audio are not stored by '.$site.'. Media goes directly between browsers when the network allows it. If a relay is configured and a direct connection fails, that relay may carry the call only while it lasts. '.$site.' still does not keep a recording.'],
-            ['q' => 'What should I do if someone behaves inappropriately?', 'a' => 'Leave the call, then report or block them. Moderators can review the report and account history. They cannot watch a recording, because none is kept.'],
-            ['q' => 'Are gender and country filters available?', 'a' => config('features.preference_matching')
-                ? 'Yes. Saved gender and country preferences are used when pairing. Anyone and any country still match freely.'
-                : 'You can save those preferences, but they do not change who you are paired with yet.'],
+            ['q' => 'What is '.$site.'?', 'a' => $site.' is a random one-to-one video chat platform. Signed-in users can be paired with another available person for a live conversation.'],
+            ['q' => 'Is '.$site.' available in India?', 'a' => $site.' is designed and marketed for adults in India and can be accessed through a supported web browser, subject to service availability and applicable requirements.'],
+            ['q' => 'How do I start a random video chat?', 'a' => 'Sign in with Google, complete the required profile details, and enter the matching experience. When another person is available, the system can pair you for a conversation.'],
+            ['q' => 'Can I choose who I meet?', 'a' => 'No. '.$matching],
+            ['q' => 'Can I video chat with girls?', 'a' => config('features.preference_matching')
+                ? 'You may meet people of different genders. Saved gender preferences are used when pairing, and a female match is still not guaranteed.'
+                : 'You may meet people of different genders, but '.$site.' does not currently guarantee female matches. Gender preferences can be saved but do not currently control matching.'],
+            ['q' => 'Can I meet people from my city or state?', 'a' => $site.' does not currently guarantee city- or state-based matching. Matches are random.'],
+            ['q' => 'Does '.$site.' support Hindi?', 'a' => 'Participants can use a language they both understand, but '.$site.' does not currently guarantee language-based matching.'],
+            ['q' => 'Is '.$site.' free?', 'a' => $site.' does not charge a fee to sign in or start a call, and the application has no paid plan. Your own network and device costs are separate. A conversation still depends on another person being available.'],
+            ['q' => 'Do I need to install an app?', 'a' => $site.' is available through a supported web browser. Camera and microphone permissions are requested by the browser when needed.'],
+            ['q' => 'Does '.$site.' record calls?', 'a' => $site.' does not store video or audio recordings. Media may pass through a configured relay during a call. That does not mean the platform records the call.'],
+            ['q' => 'Can I skip someone?', 'a' => 'Yes. Use Next to leave the current match and search for another available person, subject to the current call flow.'],
+            ['q' => 'What should I do if someone behaves inappropriately?', 'a' => 'Leave the conversation and use Block or Report. Review the Community Guidelines and Safety Center. Moderators can review the report and permitted account history. They cannot watch a recording, because none is kept.'],
+            ['q' => 'Is '.$site.' anonymous?', 'a' => 'No. Google sign-in and profile setup are required.'],
+            ['q' => 'Is '.$site.' only for adults?', 'a' => 'The service is intended for adults aged 18 and above. The application does not currently verify age with a date of birth or an identity document.'],
         ];
     }
 

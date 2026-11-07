@@ -14,7 +14,7 @@ class RobotsController extends Controller
             $site->robots_disallow_all ? 'Disallow: /' : 'Allow: /',
         ];
         foreach ([
-            '/home', '/video', '/profile', '/admin', '/match', '/blocks', '/banned', '/auth/', '/api/', '/login', '/health', '/up',
+            '/home', '/video', '/profile', '/admin', '/match', '/blocks', '/banned', '/auth/', '/api/', '/login', '/health', '/up', '/site.webmanifest',
         ] as $path) {
             $lines[] = 'Disallow: '.$path;
         }

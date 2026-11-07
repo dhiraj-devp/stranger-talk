@@ -1,6 +1,6 @@
 (function () {
     const started = Date.now();
-    const path = location.pathname + location.search;
+    const path = location.pathname || '/';
     const csrf = document.querySelector('meta[name="csrf-token"]');
     let sent = 0;
 

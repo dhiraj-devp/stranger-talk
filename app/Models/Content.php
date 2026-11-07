@@ -13,7 +13,8 @@ class Content extends Model
 
     public const RESERVED = [
         'login', 'home', 'video', 'admin', 'privacy', 'terms', 'guidelines', 'health', 'auth', 'api',
-        'profile', 'match', 'blocks', 'banned', 'blog', 'guides', 'up', 'storage', 'css', 'js',
+        'profile', 'match', 'blocks', 'banned', 'blog', 'guides', 'up', 'storage', 'css', 'js', 'hi',
+        'conversation-starters', 'random-question-generator', 'would-you-rather', 'random-topic-generator',
     ];
 
     protected $table = 'contents';

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\ContentController;
+use App\Http\Controllers\ToolController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\SitemapController;
 use App\Models\Content;
@@ -22,7 +23,10 @@ class SeoHealthCheck
 
         foreach ([
             '/', '/privacy', '/terms', '/guidelines', '/blog', '/guides', '/about', '/safety', '/contact',
-            '/random-video-chat', '/talk-to-strangers', '/omegle-alternative', '/features', '/help',
+            '/random-video-chat', '/random-video-chat-india', '/video-chat-with-strangers', '/one-to-one-video-chat',
+            '/talk-to-strangers', '/talk-to-girls-online', '/meet-new-people-online', '/make-friends-online',
+            '/free-video-chat', '/omegle-alternative', '/ometv-alternative', '/features', '/help',
+            '/conversation-starters', '/random-question-generator', '/would-you-rather', '/random-topic-generator',
         ] as $path) {
             $html = $this->render($path);
             if ($html === null) {
@@ -61,7 +65,7 @@ class SeoHealthCheck
                     }
                 }
                 foreach (['/video', '/admin', '/login', '/home'] as $private) {
-                    if (str_contains($xml, $private)) {
+                    if (preg_match('#<loc>[^<]*'.preg_quote($private, '#').'</loc>#', $xml)) {
                         $findings[] = $this->issue('error', '/sitemap.xml', $private.' appears in the sitemap.', 'Keep private and account URLs out of the sitemap.');
                     }
                 }
@@ -123,6 +127,10 @@ class SeoHealthCheck
                 '/blog' => app(ContentController::class)->blog(Request::create('/blog', 'GET')),
                 '/guides' => app(ContentController::class)->guides(Request::create('/guides', 'GET')),
                 '/login' => view('auth.login'),
+                '/conversation-starters' => app(ToolController::class)->starters(),
+                '/random-question-generator' => app(ToolController::class)->questions(),
+                '/would-you-rather' => app(ToolController::class)->rather(),
+                '/random-topic-generator' => app(ToolController::class)->topics(),
                 default => app(ContentController::class)->page(ltrim($path, '/')),
             };
             if (! is_object($view) || ! method_exists($view, 'render')) {
