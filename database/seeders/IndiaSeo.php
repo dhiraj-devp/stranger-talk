@@ -5,9 +5,15 @@ namespace Database\Seeders;
 use App\Models\Content;
 use App\Models\ContentCategory;
 use App\Models\SiteSetting;
+use Illuminate\Database\Seeder;
 
-class IndiaSeo
+class IndiaSeo extends Seeder
 {
+    public function run(): void
+    {
+        $this->sync();
+    }
+
     public function sync(): void
     {
         $defaults = SiteSetting::defaults();
